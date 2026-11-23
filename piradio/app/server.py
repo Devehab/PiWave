@@ -10,8 +10,11 @@ import time
 
 from flask import Flask, Request, jsonify, redirect, request, send_from_directory
 
+import captive
 import system
 import updater
+from bluetooth import BTError
+from radio import LiveEnded
 from settings import SettingsError
 
 log = logging.getLogger("piradio.web")
@@ -40,6 +43,8 @@ def create_app(radio):
 
     my_names = {"localhost", system.AP_IP, "piradio", "piradio.local",
                 socket.gethostname().lower(), socket.gethostname().lower() + ".local"}
+    welcomed = captive.Welcomed(os.path.join(radio.data_dir, "welcomed.json"))
+    captive_on = not system.DEV or os.environ.get("PIRADIO_CAPTIVE") == "1"
 
     def body():
         return request.get_json(silent=True) or {}
@@ -49,15 +54,24 @@ def create_app(radio):
 
     @app.errorhandler(SettingsError)
     @app.errorhandler(ValueError)
+    @app.errorhandler(BTError)
     def bad_request(e):
         return jsonify(ok=False, error=str(e)), 400
+
+    @app.errorhandler(LiveEnded)
+    def live_ended(e):
+        return jsonify(ok=False, error="انتهى البث المباشر", ended=True), 410
 
     @app.errorhandler(413)
     def too_big(e):
         return jsonify(ok=False, error="الملف كبير كثير (الحد 1GB)"), 413
 
+    def client():
+        return system.client_id(request.remote_addr)
+
     # Captive portal: phones probe e.g. captive.apple.com when they join the
-    # Wi-Fi; send every unknown host name to the radio page.
+    # Wi-Fi. New phones are sent to the welcome page (it pops up by itself);
+    # phones that tapped "Done" get the answer they expect, so it stays closed.
     @app.before_request
     def captive_redirect():
         host = (request.host or "").split(":")[0].strip("[]").lower()
@@ -68,9 +82,19 @@ def create_app(radio):
             return None
         except ValueError:
             pass
-        if system.DEV:
+        if not captive_on:
             return None
-        return redirect("http://%s/" % system.AP_IP, code=302)
+        if radio.settings.get("captive_mode") == "once" and client() in welcomed:
+            answer = captive.probe_answer(request.path)
+            if answer:
+                body_, code, mime = answer
+                r = app.response_class(body_, status=code, mimetype=mime)
+                r.headers["Cache-Control"] = "no-store"
+                return r
+            return redirect("http://%s/" % system.AP_IP, code=302)
+        r = redirect("http://%s/welcome" % system.AP_IP, code=302)
+        r.headers["Cache-Control"] = "no-store"
+        return r
 
     # ---------------- static ----------------
     @app.get("/")
@@ -78,6 +102,27 @@ def create_app(radio):
         r = send_from_directory(STATIC, "index.html")
         r.headers["Cache-Control"] = "no-cache"
         return r
+
+    @app.get("/welcome")
+    def welcome_page():
+        r = send_from_directory(STATIC, "welcome.html")
+        r.headers["Cache-Control"] = "no-store"
+        return r
+
+    @app.get("/api/captive")
+    def captive_state():
+        return jsonify(welcomed=client() in welcomed, mode=radio.settings.get("captive_mode"),
+                       count=len(welcomed), url="http://%s" % system.AP_IP)
+
+    @app.post("/api/captive/ack")
+    def captive_ack():
+        welcomed.add(client())
+        log.info("welcome page done for %s", client())
+        return ok()
+
+    @app.post("/api/captive/reset")
+    def captive_reset():
+        return ok(cleared=welcomed.clear())
 
     @app.get("/static/<path:name>")
     def static_files(name):
@@ -131,6 +176,8 @@ def create_app(radio):
     @app.post("/api/player/<action>")
     def player(action):
         p, b = radio.player, body()
+        if action in ("play", "resume", "toggle", "next", "prev", "seek", "stop", "tone"):
+            radio.library_takeover()      # the songs get the air back from the phone
         if action in ("play", "resume", "toggle", "next", "prev") and not radio.tx.wanted:
             radio.set_transmitter(True)   # pressing play means "I want to hear it"
         if action == "play":
@@ -182,6 +229,7 @@ def create_app(radio):
                 os.remove(tmp)
             raise
         if request.form.get("play") == "1":
+            radio.library_takeover()
             if not radio.tx.wanted:
                 radio.set_transmitter(True)
             radio.player.play(track["id"])
@@ -192,6 +240,48 @@ def create_app(radio):
     def delete(tid):
         if not radio.delete_track(tid):
             return jsonify(ok=False, error="الأغنية مش موجودة"), 404
+        return ok()
+
+    # ---------------- Bluetooth ----------------
+    @app.get("/api/bluetooth")
+    def bt_status():
+        return jsonify(radio.bt.status())
+
+    @app.post("/api/bluetooth/<action>")
+    def bt_action(action):
+        bt, b = radio.bt, body()
+        if action == "pairing":
+            bt.set_pairing(bool(b.get("on")))
+        elif action == "connect":
+            bt.connect(b.get("mac"))
+        elif action == "disconnect":
+            bt.disconnect(b.get("mac"))
+        elif action == "remove":
+            bt.remove(b.get("mac"))
+        elif action == "media":
+            bt.media(b.get("command"))
+        elif action == "install":
+            bt.install()
+        else:
+            return jsonify(ok=False, error="unknown action"), 404
+        return ok(bluetooth=bt.status())
+
+    # ---------------- push-to-talk (live microphone) ----------------
+    @app.post("/api/ptt/start")
+    def ptt_start():
+        return ok(sid=radio.ptt_start(client()), rate=44100)
+
+    @app.post("/api/ptt/<sid>")
+    def ptt_audio(sid):
+        data = request.get_data(cache=False)
+        if len(data) > 1024 * 1024:
+            raise ValueError("قطعة صوت كبيرة كثير")
+        radio.ptt_push(sid, data)
+        return ok()
+
+    @app.post("/api/ptt/<sid>/end")
+    def ptt_end(sid):
+        radio.ptt_end(sid)
         return ok()
 
     # ---------------- updates ----------------

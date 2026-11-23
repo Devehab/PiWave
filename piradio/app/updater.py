@@ -331,18 +331,19 @@ def deploy(src, base=BASE, state=STATE, pending=True, log=print):
         try:
             build_transmitter(incoming, log, base)
             import_check(incoming, log)
+            hook = _p(incoming, "system", "post-update.sh")
+            if pending and os.path.isfile(hook):
+                log("running post-update.sh")
+                r = subprocess.run(["bash", hook], capture_output=True, text=True, timeout=600,
+                                   env=dict(os.environ, PIRADIO_NEW=incoming,
+                                            PIRADIO_OLD=cur or ""))
+                for line in (r.stdout + r.stderr).splitlines()[-10:]:
+                    log("  " + line)
+                if r.returncode != 0:
+                    raise UpdateError("سكربت ما بعد التحديث فشل")
         except Exception:
             shutil.rmtree(incoming, ignore_errors=True)
             raise
-        hook = _p(incoming, "system", "post-update.sh")
-        if pending and os.path.isfile(hook):
-            log("running post-update.sh")
-            r = subprocess.run(["bash", hook], capture_output=True, text=True, timeout=600,
-                               env=dict(os.environ, PIRADIO_NEW=incoming, PIRADIO_OLD=cur or ""))
-            for line in (r.stdout + r.stderr).splitlines()[-10:]:
-                log("  " + line)
-            if r.returncode != 0:
-                raise UpdateError("سكربت ما بعد التحديث فشل")
 
         dest, n = _p(releases, version), 2
         while os.path.exists(dest):

@@ -1,8 +1,9 @@
 #!/bin/bash
 # =====================================================================
 #  PiRadio installer
-#  Run on the Raspberry Pi (needs internet once, for ffmpeg):
+#  Run on the Raspberry Pi (needs internet once, for ffmpeg + Bluetooth):
 #      sudo bash /boot/firmware/piradio/install.sh
+#  (or from wherever the folder is, e.g.  sudo bash ~/piradio/install.sh)
 #  Safe to run again: it repairs/upgrades an existing installation.
 # =====================================================================
 set -Eeuo pipefail
@@ -26,7 +27,7 @@ exec > >(tee -a "$LOG") 2>&1
 trap 'echo; echo "!!! INSTALL FAILED at line $LINENO. See $LOG (copy: $BOOTDIR/piradio-install.log)"; cp -f "$LOG" "$BOOTDIR/piradio-install.log" 2>/dev/null || true' ERR
 
 VERSION=$(cat "$DIR/VERSION")
-step() { echo; echo "==> [$1/9] $2"; }
+step() { echo; echo "==> [$1/10] $2"; }
 echo "=================================================="
 echo "  PiRadio $VERSION installer   $(date)"
 echo "=================================================="
@@ -63,6 +64,10 @@ apt-get update
 apt-get install -y --no-install-recommends \
   ffmpeg python3 python3-flask libsndfile1-dev gcc libc6-dev openssl \
   dnsmasq-base avahi-daemon iw rfkill
+# Bluetooth speaker mode (optional: the radio works without it)
+apt-get install -y --no-install-recommends \
+  bluez bluez-tools bluez-alsa-utils libasound2-plugin-bluez \
+  || echo "WARNING: Bluetooth packages could not be installed; FM radio still works."
 
 step 3 "Creating folders"
 mkdir -p "$BASE/releases" "$DATA/music" "$DATA/tmp" /etc/piradio "$LIB"
@@ -84,6 +89,7 @@ cp -f "$DIR/piradio.conf" "$REL/piradio.conf" 2>/dev/null || true
 step 5 "Installing the service"
 install -m 755 "$REL/app/updater.py" "$LIB/updater.py"
 install -m 755 "$REL/system/make-cert.sh" "$LIB/make-cert.sh"
+install -m 755 "$REL/system/setup-bluetooth.sh" "$LIB/setup-bluetooth.sh"
 install -m 755 "$REL/system/piradio-launch" /usr/local/sbin/piradio-launch
 install -m 755 "$REL/system/piradio-wifi" /usr/local/sbin/piradio-wifi
 install -m 644 "$REL/system/piradio.service" /etc/systemd/system/piradio.service
@@ -119,7 +125,11 @@ else
 fi
 echo "hotspot created (it starts after the reboot)"
 
-step 8 "Music folder on the SD card"
+step 8 "Bluetooth speaker \"PiRadio\""
+bash "$REL/system/setup-bluetooth.sh" \
+  || echo "WARNING: Bluetooth setup failed; FM radio still works. Retry later from the web page."
+
+step 9 "Music folder on the SD card"
 mkdir -p "$BOOTDIR/piradio-music"
 cat > "$BOOTDIR/piradio-music/README.txt" <<'EOF'
 Put MP3 / M4A / WAV / FLAC songs in this folder from your computer.
@@ -127,7 +137,7 @@ On the next start of the Raspberry Pi they are moved into the PiRadio library.
 ضع الأغاني بهذا المجلد من الكمبيوتر، وعند تشغيل الريسبيري تنتقل تلقائياً لمكتبة الراديو.
 EOF
 
-step 9 "Done"
+step 10 "Done"
 nmcli connection modify "$HOT" connection.autoconnect yes
 cp -f "$LOG" "$BOOTDIR/piradio-install.log" 2>/dev/null || true
 cat <<EOF
@@ -140,6 +150,7 @@ cat <<EOF
    Password   : $WIFI_PASSWORD
    Web page   : http://$AP_IP
    FM         : $FREQUENCY MHz  (car radio -> FM -> $FREQUENCY)
+ Bluetooth  : "PiRadio" (pairing mode: web page -> Bluetooth)
  Antenna: one ~20 cm wire on pin 7 (GPIO4) only.
 ==================================================
 EOF

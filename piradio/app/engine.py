@@ -7,6 +7,10 @@ Data flow (one continuous stream, so the car never hears static between songs):
 
 When nothing is playing the feeder sends silence, so the carrier and the
 station name stay on the car radio.
+
+Live audio (the phone's microphone over Wi-Fi, or a phone connected over
+Bluetooth) arrives as a LiveSource and temporarily takes the air from the
+song library; the library continues where it was when the live audio ends.
 """
 import collections
 import logging
@@ -24,8 +28,102 @@ CHUNK = 2048 * FRAME           # ~46 ms per write
 SILENCE = bytes(CHUNK)
 STALL_TIMEOUT = 8.0            # seconds without decoder output -> skip track
 TONE_ID = "__tone__"
+LIVE_PRIORITY = ("ptt", "bt")  # talking beats Bluetooth music
 
 log = logging.getLogger("piradio.engine")
+
+
+def peak_of(pcm):
+    """Peak level 0..1 of signed 16-bit PCM."""
+    a = array("h")
+    a.frombytes(pcm[:len(pcm) - len(pcm) % 2])
+    return max(max(a), -min(a)) / 32768.0 if a else 0.0
+
+
+def mono_to_stereo(mono):
+    """s16le mono -> s16le stereo (same sample on both channels)."""
+    n = len(mono) - len(mono) % 2
+    out = bytearray(n * 2)
+    out[0::4] = mono[0:n:2]
+    out[1::4] = mono[1:n:2]
+    out[2::4] = mono[0:n:2]
+    out[3::4] = mono[1:n:2]
+    return bytes(out)
+
+
+class LiveSource:
+    """Real-time audio pushed in from outside (raw s16le, 44.1 kHz stereo).
+
+    A small jitter buffer: playback starts once `target` seconds are queued,
+    plays silence if the stream runs dry (then waits for the cushion again),
+    and drops the oldest audio when more than `max_delay` piles up, so the
+    delay can never keep growing.
+    """
+
+    def __init__(self, kind, label="", target=0.2, max_delay=0.8):
+        self.kind = kind
+        self.label = label
+        self.target = int(target * RATE) * FRAME
+        self.max = max(self.target + CHUNK, int(max_delay * RATE) * FRAME)
+        self.created = time.monotonic()
+        self.last_push = self.created
+        self.received = 0
+        self.dropped = 0
+        self._buf = bytearray()
+        self._lock = threading.Lock()
+        self._primed = False
+        self._closed = False
+
+    def push(self, pcm):
+        if not pcm:
+            return
+        with self._lock:
+            if self._closed:
+                return
+            self._buf += pcm
+            self.received += len(pcm)
+            self.last_push = time.monotonic()
+            if len(self._buf) > self.max:
+                cut = len(self._buf) - self.target
+                cut -= cut % FRAME
+                del self._buf[:cut]
+                self.dropped += cut
+
+    def finish(self):
+        """No more audio will come: play out what is buffered, then end."""
+        with self._lock:
+            self._closed = True
+
+    @property
+    def closed(self):
+        return self._closed
+
+    @property
+    def done(self):
+        with self._lock:
+            return self._closed and len(self._buf) < FRAME
+
+    def buffered(self):
+        with self._lock:
+            return len(self._buf) / float(BPS)
+
+    def read(self, n):
+        with self._lock:
+            if not self._primed:
+                if len(self._buf) >= self.target or (self._closed and self._buf):
+                    self._primed = True
+                else:
+                    return None
+            take = min(n, len(self._buf))
+            take -= take % FRAME
+            if take == 0:
+                self._primed = False        # ran dry: build the cushion up again
+                return None
+            out = bytes(self._buf[:take])
+            del self._buf[:take]
+        if len(out) < n:
+            out += bytes(n - len(out))
+        return out
 
 
 # --------------------------------------------------------------------------
@@ -364,6 +462,54 @@ class Player:
         self._queue_version = -1
         self._fail_streak = 0
         self._tone_prev = None
+        self._live = {}                 # kind -> LiveSource currently on air
+        self._held_playing = False      # library was playing when live audio took over
+
+    # ---- live audio (microphone / Bluetooth) ----
+    def live_kind(self):
+        for kind in LIVE_PRIORITY:
+            if kind in self._live:
+                return kind
+        return None
+
+    def begin_live(self, src):
+        """Put a LiveSource on air. The song library pauses and remembers its place."""
+        with self._lock:
+            old = self._live.get(src.kind)
+            if old is not None and old is not src:
+                old.finish()
+            if not self._live:
+                self._hold_library_locked()
+            self._live[src.kind] = src
+            self._changed()
+
+    def end_live(self, kind, src=None, resume=True):
+        """Take a LiveSource off air. With resume=True the library continues
+        if it was playing before the live audio started."""
+        with self._lock:
+            cur = self._live.get(kind)
+            if cur is None or (src is not None and cur is not src):
+                return False
+            del self._live[kind]
+            cur.finish()
+            if not self._live:
+                was, self._held_playing = self._held_playing, False
+                if resume and was and self.track_id and self.track_id != TONE_ID:
+                    self._start_locked(self.track_id, self._start_pos)
+            self._changed()
+            return True
+
+    def _hold_library_locked(self):
+        if self.track_id == TONE_ID:       # the test tone is not worth resuming
+            prev, self._tone_prev = self._tone_prev, None
+            self._close_decoder_locked()
+            tid, pos, st = prev if prev and prev[0] else (None, 0.0, "stopped")
+        else:
+            tid, pos, st = self.track_id, self.position(), self.state
+            self._close_decoder_locked()
+        self._held_playing = st == "playing"
+        self.track_id, self._start_pos, self._bytes = tid, pos, 0
+        self.state = "paused" if tid and st != "stopped" else "stopped"
 
     # ---- helpers ----
     def _changed(self):
@@ -491,6 +637,14 @@ class Player:
     # ---- called by the feeder thread, ~22 times a second ----
     def read_chunk(self):
         with self._lock:
+            for kind in LIVE_PRIORITY:
+                src = self._live.get(kind)
+                if src is None:
+                    continue
+                if src.done:                  # finished talking: next source / library
+                    self.end_live(kind, src)
+                    continue
+                return src.read(CHUNK) or SILENCE
             if self.state != "playing" or self._decoder is None:
                 return SILENCE
             data = self._decoder.read(CHUNK)
@@ -668,15 +822,23 @@ class Player:
                 track = None if not t else {
                     "id": t["id"], "title": self.library.display_title(t),
                     "artist": t.get("artist"), "duration": t.get("duration")}
+            kind = self.live_kind()
+            src = self._live.get(kind) if kind else None
             return {
                 "state": self.state, "track": track,
                 "position": round(self.position(), 1),
                 "volume": self.volume, "shuffle": self.shuffle, "repeat": self.repeat,
                 "error": self.error, "seq": self.change_seq,
+                "live": None if src is None else {
+                    "kind": kind, "label": src.label,
+                    "seconds": round(time.monotonic() - src.created),
+                    "buffer": round(src.buffered(), 2)},
             }
 
     def shutdown(self):
         with self._lock:
+            for src in self._live.values():
+                src.finish()
             self._close_decoder_locked()
 
 

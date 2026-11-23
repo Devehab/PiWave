@@ -1,0 +1,15 @@
+[Unit]
+Description=PiRadio Bluetooth pairing agent (no PIN, no screen)
+Requires=bluetooth.service
+After=bluetooth.service
+
+[Service]
+# NoInputNoOutput = "just works" pairing. The adapter only accepts new phones
+# while PiRadio's pairing mode is on (Pairable), so strangers cannot pair.
+ExecStart=/usr/bin/bt-agent --capability=NoInputNoOutput
+Restart=always
+RestartSec=5
+TimeoutStopSec=5
+
+[Install]
+WantedBy=bluetooth.target

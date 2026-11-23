@@ -113,7 +113,10 @@ function render(st) {
   // now playing
   const t = p.track;
   $("#now-title").textContent = t ? t.title : "ما في شي شغال";
-  $("#now-artist").textContent = t ? (t.artist || (p.state === "paused" ? "متوقف مؤقتاً" : "")) : (st.library.count ? "اضغط ▶ أو اختار أغنية" : "ارفع أغاني من تبويب «الأغاني»");
+  $("#now-artist").textContent = p.live && t
+    ? (p.live.kind === "ptt" ? "متوقفة لحد ما تخلص حكي، وبترجع لحالها" : "متوقفة: الراديو على البلوتوث. اضغط ▶ لترجع للأغاني")
+    : t ? (t.artist || (p.state === "paused" ? "متوقف مؤقتاً" : "")) : (st.library.count ? "اضغط ▶ أو اختار أغنية" : "ارفع أغاني من تبويب «الأغاني»");
+  renderLive(st);
   $("#art").classList.toggle("playing", p.state === "playing");
   const dur = t && t.duration ? t.duration : 0;
   const seek = $("#seek");
@@ -137,6 +140,62 @@ function render(st) {
   renderGuides(st);
   if (!settingsFilled) fillSettings(st.settings);
 }
+
+/* ------------------------------------------------------------ live audio card */
+function renderLive(st) {
+  const live = st.player.live, bt = st.bt || {};
+  const card = $("#live-card");
+  const btConn = bt.installed && bt.enabled && bt.connected;
+  $("#q-bt-sub").textContent = btConn ? "متصل: " + bt.connected : bt.pairing_left ? "وضع الاقتران شغال" : "وصّل تلفونك";
+  if (!live && !btConn) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  const isPtt = live && live.kind === "ptt";
+  card.classList.toggle("on-air", !!live);
+  $("use", $("#live-ico")).setAttribute("href", isPtt ? "#i-mic" : "#i-bt");
+  $("#live-badge").classList.toggle("hidden", !live);
+  if (isPtt) {
+    $("#live-title").textContent = "بث مباشر من المايك";
+    $("#live-sub").textContent = `صار ${fmtTime(live.seconds)}`;
+  } else {
+    const tr = bt.track;
+    $("#live-title").textContent = "بلوتوث: " + (live ? live.label : bt.connected);
+    $("#live-sub").textContent = tr ? (tr.artist ? `${tr.title} · ${tr.artist}` : tr.title)
+      : live ? "صوت التلفون عم ينبث على الراديو"
+      : bt.suppressed ? "الراديو على أغاني الجهاز. وقّف وشغّل بالتلفون ليرجع عليه"
+      : "شغّل أي صوت بالتلفون وبيطلع على الراديو";
+    const playing = tr ? tr.status === "playing" : !!live;
+    $("use", $('[data-btmedia="toggle"]')).setAttribute("href", playing ? "#i-pause" : "#i-play");
+  }
+  $("#bt-ctl").classList.toggle("hidden", isPtt);
+  $("#live-back").classList.toggle("hidden", !live || isPtt);
+}
+$$("[data-btmedia]").forEach((b) => b.addEventListener("click", () => {
+  let cmd = b.dataset.btmedia;
+  if (cmd === "toggle") {
+    const tr = S && S.bt && S.bt.track;
+    const playing = tr ? tr.status === "playing" : !!(S && S.player.live);
+    cmd = playing ? "pause" : "play";
+  }
+  act(() => api("/api/bluetooth/media", { command: cmd }));
+}));
+$("#live-back").addEventListener("click", () => act(() => api("/api/player/play", {}), "رجعنا لأغاني الجهاز"));
+
+/* ------------------------------------------------------------ Bluetooth sheet */
+let btPanel = null;
+function openBT() {
+  $("#bt-sheet").classList.remove("hidden");
+  if (!btPanel) btPanel = window.PiBT.mount($("#bt-box"), { toast });
+}
+function closeBT() {
+  $("#bt-sheet").classList.add("hidden");
+  if (btPanel) { btPanel.stop(); btPanel = null; }
+  if (location.hash === "#bt") history.replaceState(null, "", "/");
+  poll(true);
+}
+$("#q-bt").addEventListener("click", openBT);
+$("#s-bt-open").addEventListener("click", openBT);
+$("#bt-close").addEventListener("click", closeBT);
+$("#bt-sheet").addEventListener("click", (e) => { if (e.target.id === "bt-sheet") closeBT(); });
 
 /* ------------------------------------------------------------ frequency */
 function setDraft(v) {
@@ -298,6 +357,11 @@ function renderChecks(c, sys) {
   if (c.audio_flowing && (c.playing || c.level > 0.02)) row("ok", "الصوت واصل للمرسل", "في صوت عم ينبث هلأ (شوف العدّاد)");
   else if (c.audio_flowing) row("wait", "الصوت واصل للمرسل", "البث شغال بس صامت. شغّل أغنية أو نغمة اختبار");
   else row(c.transmitter ? "no" : "wait", "الصوت واصل للمرسل", "ما في صوت داخل على المرسل");
+  const bt = S && S.bt;
+  if (bt && bt.installed && bt.enabled) {
+    row(bt.available ? "ok" : "no", "البلوتوث", !bt.available ? "البلوتوث مش جاهز" : bt.connected
+      ? `متصل: ${esc(bt.connected)}${bt.on_air ? " · صوته على الهوا" : ""}` : "جاهز، ما في تلفون متصل (مش ضروري)");
+  }
   if (sys.undervoltage) row("no", "الكهربا", "الشاحن ضعيف هلأ! استعمل شاحن 5V / 2.5A وكيبل منيح");
   else if (sys.undervoltage_past) row("wait", "الكهربا", "صار ضعف بالكهربا قبل شوي. جرّب شاحن أقوى");
   else row("ok", "الكهربا", sys.undervoltage === null ? "ما في قراءة (وضع التجربة)" : "الكهربا كافية");
@@ -375,7 +439,35 @@ function fillSettings(s) {
   $("#s-autoplay").checked = s.autoplay;
   $("#s-pi").value = s.pi_code;
   $("#s-ppm").value = s.ppm;
+  $("#s-captive").value = s.captive_mode || "once";
+  $("#s-bt-name-show").textContent = s.bt_name || "PiRadio";
 }
+$("#s-captive").addEventListener("change", (e) => act(() => api("/api/settings", { captive_mode: e.target.value }),
+  e.target.value === "once" ? "الصفحة رح تطلع مرة وحدة لكل تلفون" : "الصفحة رح تطلع كل ما تتصل"));
+$("#u-reset").addEventListener("click", () => {
+  if (!confirm("ترجع صفحة الترحيب تطلع لكل التلفونات من جديد؟")) return;
+  act(() => api("/api/captive/reset", {}), "تمام: رح تطلع أول ما يتصل أي تلفون");
+});
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (_) { /* http page: fallback below */ }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.cssText = "position:fixed;top:0;opacity:0";
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, text.length);
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (_) { /* old browser */ }
+  document.body.removeChild(ta);
+  return ok;
+}
+function pageURL() { return "http://" + ((sysInfo && sysInfo.wifi && sysInfo.wifi.ip) || location.hostname); }
+$("#u-copy").addEventListener("click", async () => {
+  const url = pageURL();
+  if (await copyText(url)) toast("انسخ الرابط: " + url, "ok");
+  else toast("ما قدرت أنسخ. اكتبه بالمتصفح: " + url, "bad");
+});
 $("#s-save-rds").addEventListener("click", () => {
   const ps = $("#s-ps").value.trim();
   if (!/^[ -~]{1,8}$/.test(ps)) { toast("اسم المحطة: من 1 لـ 8 أحرف إنجليزي أو أرقام", "bad"); return; }
@@ -401,7 +493,9 @@ async function loadSystem() {
       ["مدة التشغيل", `<span dir="ltr">${up}</span>`],
       ["الواي فاي", sys.wifi_mode === "hotspot" ? "شبكة الراديو" : sys.wifi_mode === "home" ? "واي فاي البيت" : "—"],
       ["عنوان الصفحة", `<span dir="ltr">http://${esc(sys.wifi.ip)}</span>`],
+      ["البلوتوث", !S || !S.bt ? "—" : !S.bt.installed ? "مش مثبت" : !S.bt.enabled ? "مطفي" : S.bt.connected ? "متصل: " + esc(S.bt.connected) : "جاهز"],
     ].map(([k, v]) => `<li><span>${k}</span><span>${v}</span></li>`).join("");
+    $("#u-url").textContent = pageURL();
     $("#v-cur").textContent = ver.running || ver.version || "?";
     $("#v-prev").textContent = ver.previous || "—";
     $("#v-rollback").disabled = !ver.previous;
@@ -609,11 +703,145 @@ $("#rec-capture").addEventListener("change", async (e) => {
   catch (err) { toast(err.message, "bad"); }
 });
 
+/* ------------------------------------------------------------ push-to-talk (live microphone) */
+const ptt = { stream: null, ctx: null, node: null, sid: null, on: false, starting: null, queue: [], sending: false, t0: 0, timer: null, level: 0 };
+function openPTT() {
+  $("#ptt").classList.remove("hidden");
+  const secure = window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+  const modern = !!(window.AudioWorkletNode && (window.AudioContext || window.webkitAudioContext));
+  $("#ptt-ok").classList.toggle("hidden", !(secure && modern));
+  $("#ptt-insecure").classList.toggle("hidden", !!secure);
+  $("#ptt-old").classList.toggle("hidden", !secure || modern);
+  $("#ptt-https").href = "https://" + location.hostname + "/#talk";
+  pttUI("ready");
+  if (secure && modern && !ptt.node) {   // ask for the microphone now, so pressing starts instantly
+    pttMic().catch((e) => toast(e && e.name === "NotAllowedError" ? "ما في صلاحية للمايكروفون. اسمح للمتصفح يستعمل المايك." : "ما قدرت أشغّل المايك", "bad"));
+  }
+}
+async function closePTT() {
+  await pttStop();
+  if (ptt.stream) ptt.stream.getTracks().forEach((t) => t.stop());
+  if (ptt.ctx) ptt.ctx.close().catch(() => {});
+  ptt.stream = ptt.ctx = ptt.node = null;
+  $("#ptt").classList.add("hidden");
+  if (location.hash === "#talk") history.replaceState(null, "", "/");
+}
+function pttUI(mode) {
+  const btn = $("#ptt-btn"), latch = $("#ptt-latch").checked;
+  btn.classList.toggle("live", mode === "live");
+  btn.classList.toggle("wait", mode === "wait");
+  $("#ptt-status").className = "ptt-status " + mode;
+  $("#ptt-state").textContent = { ready: "جاهز", wait: "جاري التجهيز…", live: "🔴 على الهوا", lost: "انقطع الاتصال" }[mode] || mode;
+  $("#ptt-label").textContent = mode === "live" ? (latch ? "اضغط لتوقف" : "اترك الزر لتوقف") : (latch ? "اضغط مرة وابدأ احكي" : "اضغط مطوّل واحكي");
+  if (mode !== "live") { $("#ptt-time").textContent = ""; $("#ptt-level").style.width = "0"; }
+}
+async function pttMic() {
+  if (ptt.node) return;
+  if (ptt.micPromise) return ptt.micPromise;
+  ptt.micPromise = pttMicOpen().finally(() => { ptt.micPromise = null; });
+  return ptt.micPromise;
+}
+async function pttMicOpen() {
+  ptt.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const AC = window.AudioContext || window.webkitAudioContext;
+  ptt.ctx = new AC();
+  await ptt.ctx.audioWorklet.addModule("/static/ptt-worklet.js");
+  const pre = S ? S.settings.preemphasis : "50";
+  ptt.node = new AudioWorkletNode(ptt.ctx, "ptt-processor", { processorOptions: { tau: pre === "75" ? 75e-6 : pre === "50" ? 50e-6 : 0 } });
+  ptt.node.port.onmessage = (e) => {
+    ptt.level = Math.max(e.data.peak, ptt.level * 0.7);
+    if (!ptt.on) return;
+    $("#ptt-level").style.width = Math.min(100, ptt.level * 130) + "%";
+    ptt.queue.push(new Int16Array(e.data.pcm));
+    pttPump();
+  };
+  const mute = ptt.ctx.createGain();
+  mute.gain.value = 0;
+  ptt.ctx.createMediaStreamSource(ptt.stream).connect(ptt.node);
+  ptt.node.connect(mute).connect(ptt.ctx.destination);
+}
+async function pttStart() {
+  if (ptt.on || ptt.starting) return;
+  pttUI("wait");
+  ptt.starting = (async () => {
+    try {
+      await pttMic();
+      if (ptt.ctx.state !== "running") await ptt.ctx.resume();
+      ptt.queue = [];
+      ptt.on = true;
+      const j = await api("/api/ptt/start", {});
+      ptt.sid = j.sid;
+      ptt.t0 = Date.now();
+      clearInterval(ptt.timer);
+      ptt.timer = setInterval(() => { $("#ptt-time").textContent = fmtTime((Date.now() - ptt.t0) / 1000); }, 300);
+      if (navigator.vibrate) navigator.vibrate(30);
+      pttUI("live");
+      pttPump();
+      poll(true);
+    } catch (e) {
+      ptt.on = false;
+      pttUI("ready");
+      toast(e && e.name === "NotAllowedError" ? "ما في صلاحية للمايكروفون. اسمح للمتصفح يستعمل المايك." : (e.message || "ما زبط"), "bad");
+    }
+  })();
+  await ptt.starting;
+  ptt.starting = null;
+}
+async function pttStop() {
+  if (ptt.starting) await ptt.starting;
+  if (!ptt.on) return;
+  ptt.on = false;
+  clearInterval(ptt.timer);
+  pttUI("ready");
+  await pttPump(true);
+  const sid = ptt.sid;
+  ptt.sid = null;
+  if (sid) { try { await api(`/api/ptt/${sid}/end`, {}); } catch (_) { /* it ends by itself */ } }
+  poll(true);
+}
+// Sends queued audio in order, one request at a time (a slow request just makes the next one bigger).
+async function pttPump(drain) {
+  if (ptt.sending) { if (drain) { while (ptt.sending) await new Promise((r) => setTimeout(r, 20)); } else return; }
+  while (ptt.sid && ptt.queue.length) {
+    const parts = ptt.queue.splice(0);
+    const all = new Int16Array(parts.reduce((n, p) => n + p.length, 0));
+    let o = 0;
+    for (const p of parts) { all.set(p, o); o += p.length; }
+    ptt.sending = true;
+    try {
+      const r = await fetch(`/api/ptt/${ptt.sid}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: all.buffer });
+      if (r.status === 410) { ptt.on = false; ptt.sid = null; clearInterval(ptt.timer); pttUI("ready"); toast("انتهى البث المباشر (حدا تاني بلّش يحكي أو انقطع الاتصال)", "bad"); }
+    } catch (_) {
+      if (ptt.on) pttUI("lost");
+    } finally { ptt.sending = false; }
+    if (!drain && !ptt.on) break;
+  }
+}
+const pttBtn = $("#ptt-btn");
+pttBtn.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  if (ptt.ctx && ptt.ctx.state !== "running") ptt.ctx.resume().catch(() => {});
+  if ($("#ptt-latch").checked) { if (ptt.on) pttStop(); else pttStart(); return; }
+  try { pttBtn.setPointerCapture(e.pointerId); } catch (_) { /* old browser */ }
+  pttStart();
+});
+["pointerup", "pointercancel", "lostpointercapture"].forEach((ev) => pttBtn.addEventListener(ev, () => {
+  if (!$("#ptt-latch").checked) pttStop();
+}));
+pttBtn.addEventListener("contextmenu", (e) => e.preventDefault());
+$("#ptt-latch").addEventListener("change", () => { if (!ptt.on) pttUI("ready"); });
+$("#ptt-close").addEventListener("click", closePTT);
+$("#ptt").addEventListener("click", (e) => { if (e.target.id === "ptt") closePTT(); });
+$("#q-talk").addEventListener("click", openPTT);
+document.addEventListener("visibilitychange", () => { if (document.hidden && ptt.on) pttStop(); });
+
 /* ------------------------------------------------------------ start */
 $("#pinout").innerHTML = pinoutSVG();
 document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(true); });
 const savedTab = store.get("tab");
 showTab(["radio", "songs", "check", "settings"].includes(savedTab) ? savedTab : "radio");
 if (location.hash === "#record") { showTab("radio"); openRecorder(); }
+if (location.hash === "#talk") { showTab("radio"); openPTT(); }
+if (location.hash === "#bt") { showTab("radio"); openBT(); }
 poll();
 loadLibrary();

@@ -7,13 +7,17 @@ updater the Pi uses, then driven through its HTTP API.
 
 usage: test_all.py <scratch-dir> <sim-binary> <python-with-flask+requests>
 """
+import fcntl
 import json
+import math
 import os
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 import zipfile
 
@@ -30,6 +34,15 @@ RUN = os.path.join(WORK, "run")
 BOOT = os.path.join(WORK, "boot-music")
 LOG = os.path.join(WORK, "server.log")
 SONGS = os.path.join(WORK, "songs")
+FAKE_BT = os.path.join(WORK, "fakebt.json")
+BT_FIFO = os.path.join(WORK, "phone-audio.fifo")
+VERSION = open(os.path.join(PKG, "VERSION")).read().strip()
+MAJ, MIN, PATCH = (int(x) for x in VERSION.split("."))
+
+
+def ver(n):
+    """A version newer than the one being tested (for update tests)."""
+    return "%d.%d.%d" % (MAJ, MIN, PATCH + n)
 
 sys.path.insert(0, os.path.join(PKG, "app"))
 os.environ.update(PIRADIO_BASE=BASE, PIRADIO_DATA=DATA, PIRADIO_FAKE_TX=SIM)
@@ -82,7 +95,10 @@ def sim_lines(since):
 def env():
     e = dict(os.environ, PIRADIO_DEV="1", PIRADIO_BASE=BASE, PIRADIO_DATA=DATA, PIRADIO_RUN=RUN,
              PIRADIO_HTTP_PORT=str(PORT), PIRADIO_HTTPS_PORT="0", PIRADIO_BOOT_MUSIC=BOOT,
-             PIRADIO_FAKE_TX=SIM, TMPDIR=os.path.join(DATA, "tmp"))
+             PIRADIO_FAKE_TX=SIM, TMPDIR=os.path.join(DATA, "tmp"),
+             PIRADIO_BUSCTL=os.path.join(ROOT, "dev", "fake_busctl.py"), PIRADIO_FAKE_BT=FAKE_BT,
+             PIRADIO_BT_INSTALLED="1", PIRADIO_CAPTIVE="1",
+             PIRADIO_BT_INPUT="-f s16le -ar 44100 -ac 2 -i " + BT_FIFO)
     e.pop("PIRADIO_TX", None)  # must default to <current release>/bin/pi_fm_rds
     return e
 
@@ -142,6 +158,109 @@ def build_package(version, mutate=None, tamper=False):
     return out
 
 
+# ---------------------------------------------------------------- fake phone
+def v(sig, data):
+    return {"type": sig, "data": data}
+
+
+def bt_edit(fn):
+    """Change the fake BlueZ state the same (locked) way fake_busctl.py does."""
+    with open(FAKE_BT + ".lock", "w") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        with open(FAKE_BT) as f:
+            st = json.load(f)
+        fn(st)
+        with open(FAKE_BT + ".tmp", "w") as f:
+            json.dump(st, f, indent=1)
+        os.replace(FAKE_BT + ".tmp", FAKE_BT)
+        fcntl.flock(lk, fcntl.LOCK_UN)
+
+
+def bt_state():
+    with open(FAKE_BT) as f:
+        return json.load(f)
+
+
+ADAPTER = "/org/bluez/hci0"
+PHONE_MAC = "AA:BB:CC:DD:EE:02"
+PHONE = ADAPTER + "/dev_" + PHONE_MAC.replace(":", "_")
+
+
+def bt_init():
+    st = {"objects": {
+        ADAPTER: {"org.bluez.Adapter1": {
+            "Address": v("s", "B8:27:EB:00:00:01"), "Alias": v("s", "raspberrypi"),
+            "Powered": v("b", True), "Discoverable": v("b", False), "Pairable": v("b", True),
+            "DiscoverableTimeout": v("u", 0), "PairableTimeout": v("u", 0)}},
+        ADAPTER + "/dev_AA_BB_CC_DD_EE_01": {"org.bluez.Device1": {
+            "Address": v("s", "AA:BB:CC:DD:EE:01"), "Alias": v("s", "Old Phone"),
+            "Paired": v("b", True), "Trusted": v("b", True), "Connected": v("b", False)}}},
+        "calls": [], "phone_away": True}
+    with open(FAKE_BT, "w") as f:
+        json.dump(st, f)
+    if not os.path.exists(BT_FIFO):
+        os.mkfifo(BT_FIFO)
+
+
+def phone_pairs_and_connects(st):
+    o = st["objects"]
+    o[PHONE] = {"org.bluez.Device1": {"Address": v("s", PHONE_MAC), "Alias": v("s", "Galaxy S24"),
+                                      "Paired": v("b", True), "Trusted": v("b", False),
+                                      "Connected": v("b", True), "Icon": v("s", "phone")}}
+    o[PHONE + "/sep1/fd0"] = {"org.bluez.MediaTransport1": {"Device": v("o", PHONE), "State": v("s", "active")}}
+    o[PHONE + "/player0"] = {"org.bluez.MediaPlayer1": {
+        "Device": v("o", PHONE), "Status": v("s", "playing"),
+        "Track": v("a{sv}", {"Title": v("s", "Ya Habibi"), "Artist": v("s", "Test Artist")})}}
+
+
+def phone_disconnects(st):
+    o = st["objects"]
+    o[PHONE]["org.bluez.Device1"]["Connected"] = v("b", False)
+    for k in [k for k in o if k.startswith(PHONE + "/")]:
+        del o[k]
+
+
+class PhoneAudio(threading.Thread):
+    """Plays a tone into the Bluetooth audio pipe in real time (like BlueALSA
+    would); .playing can be switched off to pretend the phone paused."""
+
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.playing = threading.Event()
+        self.playing.set()
+        self.stop = threading.Event()
+        self.written = 0
+
+    def run(self):
+        frames = 2048
+        chunk = b"".join(struct.pack("<hh", int(9000 * math.sin(2 * math.pi * 660 * i / 44100)),
+                                     int(9000 * math.sin(2 * math.pi * 660 * i / 44100)))
+                         for i in range(frames))
+        silence = bytes(len(chunk))
+        try:
+            fd = os.open(BT_FIFO, os.O_WRONLY)     # waits for PiRadio's ffmpeg
+        except OSError:
+            return
+        t = time.time()
+        try:
+            while not self.stop.is_set():
+                if self.playing.is_set():
+                    os.write(fd, chunk)
+                    self.written += len(chunk)
+                t += frames / 44100.0
+                time.sleep(max(0, t - time.time()))
+        except OSError:
+            pass                                    # PiRadio closed the stream (phone disconnected)
+        finally:
+            os.close(fd)
+        del silence
+
+
+def tone_mono(seconds, freq=440, amp=12000):
+    n = int(44100 * seconds)
+    return b"".join(struct.pack("<h", int(amp * math.sin(2 * math.pi * freq * i / 44100))) for i in range(n))
+
+
 def upload_update(path):
     with open(path, "rb") as f:
         return api("POST", "/api/update", files={"file": (os.path.basename(path), f)})
@@ -155,9 +274,10 @@ def main():
     open(LOG, "w").close()
 
     print("== install (same code path as install.sh)")
+    bt_init()
     v = updater.deploy(PKG, BASE, DATA, pending=False, log=lambda m: None)
     rel = os.path.realpath(os.path.join(BASE, "current"))
-    check("installer deploys version 1.0.0", v == "1.0.0" and os.path.isfile(os.path.join(rel, "bin", "pi_fm_rds")), v)
+    check("installer deploys version %s" % VERSION, v == VERSION and os.path.isfile(os.path.join(rel, "bin", "pi_fm_rds")), v)
 
     print("== songs copied onto the SD card")
     make_song("first.mp3", 330, 6, "First Song", "Band A")
@@ -178,7 +298,7 @@ def main():
     check("2 good songs imported from the card", len(lib["tracks"]) == 2, lib)
     check("broken file listed as bad", [b["file"] for b in lib["bad"]] == ["broken.mp3"], lib.get("bad"))
     check("SD-card folder emptied, ._ junk removed", os.listdir(BOOT) == [], os.listdir(BOOT))
-    check("version 1.0.0 reported", st and st["version"] == "1.0.0", st and st.get("version"))
+    check("version %s reported" % VERSION, st and st["version"] == VERSION, st and st.get("version"))
     mark = len(log_text())
     time.sleep(3)
     lines = sim_lines(mark)
@@ -306,6 +426,114 @@ def main():
     st = wait_until(lambda: (lambda s: s if s["player"]["track"] and s["player"]["track"]["id"] == before else None)(state()), 25)
     check("after the tone the previous song resumes", st is not None, state()["player"])
 
+    print("== welcome page (captive portal)")
+    probe = lambda host, path: requests.get(URL + path, headers={"Host": host}, allow_redirects=False, timeout=5)
+    r = probe("captive.apple.com", "/hotspot-detect.html")
+    check("new phone is sent to the welcome page", r.status_code == 302 and r.headers.get("Location", "").endswith("/welcome"), (r.status_code, r.headers.get("Location")))
+    r = requests.get(URL + "/welcome", timeout=5)
+    check("welcome page loads", r.status_code == 200 and "تم، فهمت" in r.text, r.status_code)
+    code, j = api("POST", "/api/captive/ack")
+    r1 = probe("captive.apple.com", "/hotspot-detect.html")
+    r2 = probe("connectivitycheck.gstatic.com", "/generate_204")
+    r3 = probe("www.msftconnecttest.com", "/connecttest.txt")
+    check("after «Done» the phone gets the normal answers (no pop-up)",
+          code == 200 and r1.status_code == 200 and "Success" in r1.text and r2.status_code == 204 and r3.text == "Microsoft Connect Test",
+          (code, r1.status_code, r2.status_code, r3.text[:40]))
+    check("other web addresses still lead to the radio page", probe("example.com", "/").headers.get("Location") == "http://192.168.4.1/", "")
+    api("POST", "/api/settings", json={"captive_mode": "always"})
+    check("mode «every time» shows the welcome page again", probe("captive.apple.com", "/hotspot-detect.html").status_code == 302, "")
+    api("POST", "/api/settings", json={"captive_mode": "once"})
+    code, j = api("POST", "/api/captive/reset")
+    check("reset: every phone sees the welcome page again", code == 200 and probe("captive.apple.com", "/hotspot-detect.html").status_code == 302, j)
+    api("POST", "/api/captive/ack")
+
+    print("== push-to-talk (live microphone)")
+    before = state()["player"]
+    code, j = api("POST", "/api/ptt/start", json={})
+    sid = j.get("sid") if isinstance(j, dict) else None
+    check("talk button starts a live session", code == 200 and sid, j)
+    mark = len(log_text())
+    pcm = tone_mono(3.0)
+    step = 4410 * 2                     # 100 ms like the browser
+    t0 = time.time()
+    for i in range(0, len(pcm), step):
+        api("POST", "/api/ptt/" + sid, data=pcm[i:i + step], headers={"Content-Type": "application/octet-stream"})
+        if i == step * 15:
+            mid = state()
+            code_busy, j_busy = api("POST", "/api/player/next", json={})
+        time.sleep(max(0, t0 + (i + step) / 88200.0 - time.time()))
+    check("voice is on air, the song waits", mid["player"]["live"] and mid["player"]["live"]["kind"] == "ptt" and mid["player"]["state"] == "paused", mid["player"])
+    check("song buttons wait while someone talks", code_busy == 400 and "يحكي" in j_busy.get("error", ""), (code_busy, j_busy))
+    check("car display says LIVE while talking", wait_until(lambda: 'RT set to: "LIVE - ' in log_text()[mark:], 3), "")
+    check("microphone audio reaches the transmitter", any("audio=1" in l for l in sim_lines(mark)), sim_lines(mark)[-3:])
+    api("POST", "/api/ptt/%s/end" % sid, json={})
+    st = wait_until(lambda: (lambda s: s if not s["player"]["live"] and s["player"]["state"] == "playing" else None)(state()), 5)
+    check("after talking the song continues by itself", st and st["player"]["track"]["id"] == before["track"]["id"], state()["player"])
+    code, j = api("POST", "/api/ptt/" + sid, data=pcm[:step])
+    check("audio after the end is refused (410)", code == 410, (code, j))
+    code, j = api("POST", "/api/ptt/start", json={})
+    api("POST", "/api/ptt/" + j["sid"], data=pcm[:step * 5])
+    st = wait_until(lambda: (lambda s: s if not s["player"]["live"] and s["player"]["state"] == "playing" else None)(state()), 8)
+    check("phone vanishes mid-talk: live ends by itself", st is not None, state()["player"])
+
+    print("== Bluetooth")
+    b = api("GET", "/api/bluetooth")[1]
+    a = bt_state()["objects"][ADAPTER]["org.bluez.Adapter1"]
+    check("Bluetooth ready, shows up as «PiRadio»", b["available"] and b["name"] == "PiRadio" and a["Alias"]["data"] == "PiRadio", b)
+    check("not pairable unless pairing mode is on", a["Pairable"]["data"] is False and a["Discoverable"]["data"] is False, a)
+    check("paired phones are listed", [d["name"] for d in b["devices"]] == ["Old Phone"], b["devices"])
+    code, j = api("POST", "/api/bluetooth/pairing", json={"on": True})
+    a = bt_state()["objects"][ADAPTER]["org.bluez.Adapter1"]
+    check("pairing mode on: discoverable + pairable, BlueZ turns it off after 3 min too",
+          code == 200 and j["bluetooth"]["pairing_left"] > 170 and a["Discoverable"]["data"] and a["Pairable"]["data"]
+          and a["DiscoverableTimeout"]["data"] == 180, (code, a))
+    phone = PhoneAudio()
+    phone.start()
+    bt_edit(phone_pairs_and_connects)
+    b = wait_until(lambda: (lambda b: b if b["just_paired"] else None)(api("GET", "/api/bluetooth")[1]), 8)
+    a = bt_state()["objects"][ADAPTER]["org.bluez.Adapter1"]
+    check("new phone paired: pairing mode ends by itself", b and b["just_paired"] == "Galaxy S24" and not b["pairing_left"] and a["Discoverable"]["data"] is False, b)
+    check("new phone is trusted (reconnects without asking)", bt_state()["objects"][PHONE]["org.bluez.Device1"]["Trusted"]["data"] is True, "")
+    mark = len(log_text())
+    st = wait_until(lambda: (lambda s: s if s["player"]["live"] and s["player"]["live"]["kind"] == "bt" else None)(state()), 10)
+    check("phone music takes the air from the songs", st and st["player"]["state"] == "paused" and st["bt"]["on_air"], st and (st["player"], st["bt"]))
+    check("phone's song name on the car display", wait_until(lambda: 'RT set to: "Test Artist - Ya Habibi"' in log_text()[mark:], 4), "")
+    time.sleep(2)
+    check("phone audio reaches the transmitter", sum("audio=1" in l for l in sim_lines(mark)) >= 2 and phone.written > 0, sim_lines(mark)[-3:])
+    code, j = api("POST", "/api/bluetooth/media", json={"command": "pause"})
+    check("phone controls from the page (AVRCP)", code == 200 and bt_state().get("media", [])[-1:] == ["Pause"], (code, j))
+    code, j = api("POST", "/api/player/play", json={})
+    time.sleep(0.8)
+    s = state()
+    check("pressing play on the page brings the songs back", code == 200 and s["player"]["state"] == "playing" and not s["player"]["live"] and s["bt"]["suppressed"], s["bt"])
+    time.sleep(2)
+    check("…and the phone doesn't grab it back while it keeps playing", not state()["player"]["live"], state()["bt"])
+    phone.playing.clear()                                   # phone paused
+    time.sleep(3)
+    phone.playing.set()                                     # and plays again
+    st = wait_until(lambda: (lambda s: s if s["player"]["live"] else None)(state()), 6)
+    check("phone pauses and plays again: it takes the air again", st is not None, state()["bt"])
+    phone.playing.clear()
+    st = wait_until(lambda: (lambda s: s if not s["player"]["live"] and s["player"]["state"] == "playing" else None)(state()), 12)
+    check("phone quiet for a few seconds: songs continue", st is not None, state()["player"])
+    phone.playing.set()
+    wait_until(lambda: state()["player"]["live"], 6)
+    bt_edit(phone_disconnects)
+    st = wait_until(lambda: (lambda s: s if not s["player"]["live"] and not s["bt"]["connected"] else None)(state()), 8)
+    check("phone disconnects: songs continue, Bluetooth audio stops", st and st["player"]["state"] == "playing", state()["bt"])
+    phone.stop.set()
+    code, j = api("POST", "/api/bluetooth/remove", json={"mac": PHONE_MAC})
+    check("unpair from the page", code == 200 and PHONE not in bt_state()["objects"], (code, j))
+    code, j = api("POST", "/api/settings", json={"bt_name": "x" * 40})
+    check("too long Bluetooth name refused", code == 400, j)
+    code, j = api("POST", "/api/settings", json={"bt_name": "Car Radio"})
+    a = bt_state()["objects"][ADAPTER]["org.bluez.Adapter1"]
+    check("Bluetooth name change", code == 200 and a["Alias"]["data"] == "Car Radio", a["Alias"])
+    code, j = api("POST", "/api/settings", json={"bt_enabled": False})
+    a = bt_state()["objects"][ADAPTER]["org.bluez.Adapter1"]
+    check("Bluetooth off from the page", code == 200 and a["Powered"]["data"] is False and api("GET", "/api/state")[1]["bt"]["enabled"] is False, a["Powered"])
+    api("POST", "/api/settings", json={"bt_enabled": True})
+
     print("== persistence across restart (car switched off and on)")
     api("POST", "/api/frequency", json={"frequency": 107.9})
     time.sleep(1)
@@ -317,22 +545,22 @@ def main():
     check("after reboot: same frequency + same song resumes", st and st["tx"]["frequency"] == 107.9 and st["player"]["track"]["id"] == tid, st and (st["tx"], st["player"]))
 
     print("== updates")
-    pkg101 = build_package("1.0.1")
+    pkg101 = build_package(ver(1))
     code, j = upload_update(pkg101)
-    check("update 1.0.1 installs", code == 200 and j.get("version") == "1.0.1", j)
+    check("update %s installs" % ver(1), code == 200 and j.get("version") == ver(1), j)
     check("unchanged transmitter source is reused (no recompile)", any("reused" in l for l in j.get("log", [])), j.get("log"))
     stop_server()
     start_server()
-    check("running 1.0.1 after restart", state()["version"] == "1.0.1", state().get("version"))
+    check("running %s after restart" % ver(1), state()["version"] == ver(1), state().get("version"))
     v = wait_until(lambda: (lambda i: i if i["result"] and i["result"].get("result") == "ok" else None)(api("GET", "/api/version")[1]), 25)
-    check("1.0.1 confirmed healthy, previous = 1.0.0", v and v["version"] == "1.0.1" and v["previous"] == "1.0.0", api("GET", "/api/version")[1])
+    check("%s confirmed healthy, previous = %s" % (ver(1), VERSION), v and v["version"] == ver(1) and v["previous"] == VERSION, api("GET", "/api/version")[1])
 
     def syntax_error(root):
         with open(os.path.join(root, "app", "server.py"), "a") as f:
             f.write("\ndef broken(:\n")
-    code, j = upload_update(build_package("1.0.2", mutate=syntax_error))
-    check("update with broken code is refused, nothing changes", code == 400 and "خطأ" in j["error"] and state()["version"] == "1.0.1", j)
-    code, j = upload_update(build_package("1.0.2", tamper=True))
+    code, j = upload_update(build_package(ver(2), mutate=syntax_error))
+    check("update with broken code is refused, nothing changes", code == 400 and "خطأ" in j["error"] and state()["version"] == ver(1), j)
+    code, j = upload_update(build_package(ver(2), tamper=True))
     check("tampered/corrupt update refused", code == 400 and "rdstext.py" in j["error"], j)
     junk = os.path.join(WORK, "junk.tar.gz")
     with open(junk, "wb") as f:
@@ -349,32 +577,32 @@ def main():
         p = os.path.join(root, "app", "engine.py")
         s = open(p, encoding="utf-8").read().replace('"%.2f" % p["freq"]', '"999"')
         open(p, "w", encoding="utf-8").write(s)
-    code, j = upload_update(build_package("1.0.3", mutate=bad_transmitter))
-    check("update 1.0.3 (bad at runtime) installs", code == 200, j)
+    code, j = upload_update(build_package(ver(3), mutate=bad_transmitter))
+    check("update %s (bad at runtime) installs" % ver(3), code == 200, j)
     stop_server()
     start_server()
-    check("1.0.3 running", state()["version"] == "1.0.3", state().get("version"))
+    check("%s running" % ver(3), state()["version"] == ver(3), state().get("version"))
     print("   (waiting up to 100 s for the automatic health check...)", flush=True)
     v = wait_until(lambda: (lambda i: i if i["result"] and i["result"].get("result") == "rolled_back" else None)(updater.info(BASE, DATA)), 110, 2)
-    check("unhealthy 1.0.3 rolled back automatically to 1.0.1", v and v["version"] == "1.0.1", updater.info(BASE, DATA))
+    check("unhealthy %s rolled back automatically to %s" % (ver(3), ver(1)), v and v["version"] == ver(1), updater.info(BASE, DATA))
     stop_server()
     start_server()
-    check("after rollback the radio runs 1.0.1 and is on air",
-          wait_until(lambda: state()["version"] == "1.0.1" and state()["tx"]["status"] == "on_air", 10), state())
+    check("after rollback the radio runs %s and is on air" % ver(1),
+          wait_until(lambda: state()["version"] == ver(1) and state()["tx"]["status"] == "on_air", 10), state())
 
     # crash-loop guard (piradio-launch runs launch-check before each start)
     stop_server()
-    upd = build_package("1.0.4")
+    upd = build_package(ver(4))
     updater.deploy(upd, BASE, DATA, pending=True, log=lambda m: None)
     for _ in range(4):
         updater.launch_check(BASE, DATA)
     i = updater.info(BASE, DATA)
-    check("crashing 3 times after an update rolls back", i["version"] == "1.0.1" and i["result"]["result"] == "rolled_back", i)
+    check("crashing 3 times after an update rolls back", i["version"] == ver(1) and i["result"]["result"] == "rolled_back", i)
 
     start_server()
     code, j = api("POST", "/api/update/rollback", json={})
     i = updater.info(BASE, DATA)
-    check("manual rollback button switches versions", code == 200 and i["version"] == "1.0.4" and i["previous"] == "1.0.1", (code, j, i))
+    check("manual rollback button switches versions", code == 200 and i["version"] == ver(4) and i["previous"] == ver(1), (code, j, i))
     releases = sorted(n for n in os.listdir(os.path.join(BASE, "releases")) if not n.startswith("."))
     check("old releases pruned (keeps current + previous)", len(releases) <= 2, releases)
     code, text = api("GET", "/api/logs")

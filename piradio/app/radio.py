@@ -1,11 +1,13 @@
 """RadioApp: wires settings, library, transmitter, player and feeder together."""
 import logging
 import os
+import secrets
 import threading
 import time
 
 import system
-from engine import Feeder, Player, Transmitter, TONE_ID
+from bluetooth import BluetoothManager, BTError
+from engine import Feeder, LiveSource, Player, Transmitter, TONE_ID, mono_to_stereo
 from library import Library
 from rdstext import ps_segments, to_rds
 from settings import Settings
@@ -13,6 +15,13 @@ from settings import Settings
 log = logging.getLogger("piradio")
 
 BOOT_MUSIC_DIRS = ["/boot/firmware/piradio-music", "/boot/piradio-music"]
+RELEASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PTT_IDLE = 3.0          # s without microphone audio -> the phone went away, end live
+PTT_MAX = 15 * 60       # one push-to-talk session at most 15 minutes
+
+
+class LiveEnded(Exception):
+    """The push-to-talk session is over (replaced, timed out or finished)."""
 
 
 class RadioApp:
@@ -28,6 +37,13 @@ class RadioApp:
         self.tx = Transmitter(tx_binary, os.path.join(run_dir, "rds_ctl"))
         self.player = Player(self.library, ffmpeg, os.path.join(run_dir, "ffmpeg.log"))
         self.feeder = Feeder(self.tx, self.player)
+        self.bt = BluetoothManager(self.player, self.settings, ffmpeg,
+                                   errlog=os.path.join(run_dir, "bt-ffmpeg.log"),
+                                   on_live=self._wanted_on_air,
+                                   setup_script=os.path.join(RELEASE_DIR, "system",
+                                                             "setup-bluetooth.sh"))
+        self._ptt = None
+        self._ptt_lock = threading.Lock()
         s = self.settings.all()
         self.tx.params.update(freq=s["frequency"], ps=s["station_name"], pi=s["pi_code"],
                               ppm=s["ppm"], rt=to_rds(s["radiotext"], 64))
@@ -46,6 +62,7 @@ class RadioApp:
     def start(self, background=True):
         """Carrier first (radio comes on air fast), then the library, then autoplay."""
         self.feeder.start()
+        self.bt.start()
         threading.Thread(target=self._housekeeping, daemon=True, name="housekeeping").start()
         if self.settings.get("transmit_on_boot"):
             self.tx.turn_on()
@@ -75,6 +92,7 @@ class RadioApp:
     def shutdown(self):
         self._stop.set()
         self._save_position(force=True)
+        self.bt.shutdown()
         self.feeder.stop()
         self.player.shutdown()
         self.tx.shutdown()
@@ -83,6 +101,17 @@ class RadioApp:
     def _current_rt(self):
         s = self.settings.all()
         snap = self.player.snapshot()
+        live = snap["live"]
+        if live and live["kind"] == "ptt":
+            return to_rds("LIVE - " + (s["radiotext"] or s["station_name"]), 64)
+        if live and live["kind"] == "bt":
+            bt = self.bt.track()
+            if s["rds_song_text"] and bt:
+                text = bt["title"] if not bt["artist"] else "%s - %s" % (bt["artist"], bt["title"])
+                rt = to_rds(text, 64)
+                if rt:
+                    return rt
+            return to_rds(s["radiotext"], 64) or " "
         t = snap["track"]
         if s["rds_song_text"] and t and snap["state"] == "playing" and t["id"] != TONE_ID:
             text = t["title"] if not t.get("artist") else "%s - %s" % (t["artist"], t["title"])
@@ -110,12 +139,13 @@ class RadioApp:
                 seq = self.player.change_seq
                 if seq != self._last_seq:
                     self._last_seq = seq
-                    self.tx.configure(rt=self._current_rt())
                     self._save_position(force=True)
                     self._ps_segs, self._ps_idx, self._ps_next = [], 0, 0.0
                 elif self.player.state == "playing":
                     self._save_position()
+                self.tx.configure(rt=self._current_rt())   # only sent when it changed
                 self._scroll_ps()
+                self._ptt_watchdog()
             except Exception:   # never let the background loop die
                 log.exception("housekeeping error")
 
@@ -125,7 +155,8 @@ class RadioApp:
         station = s["station_name"]
         snap = self.player.snapshot()
         t = snap["track"]
-        want_scroll = s["ps_scroll"] and snap["state"] == "playing" and t and t["id"] != TONE_ID
+        want_scroll = s["ps_scroll"] and snap["state"] == "playing" and t and t["id"] != TONE_ID \
+            and not snap["live"]
         now = time.monotonic()
         if not want_scroll:
             if self._ps_shown not in (None, station):
@@ -157,7 +188,8 @@ class RadioApp:
 
     def update_settings(self, values):
         allowed = {"station_name", "radiotext", "rds_song_text", "ps_scroll", "pi_code", "ppm",
-                   "preemphasis", "transmit_on_boot", "autoplay"}
+                   "preemphasis", "transmit_on_boot", "autoplay", "bt_enabled", "bt_takeover",
+                   "bt_name", "captive_mode"}
         values = {k: v for k, v in values.items() if k in allowed}
         changed = self.settings.update(**values)
         s = self.settings.all()
@@ -171,11 +203,20 @@ class RadioApp:
             self.tx.configure(rt=self._current_rt())
         if "preemphasis" in changed:
             self.player.set_audio(preemphasis=s["preemphasis"])
+            self.bt.restart_capture()
+        try:
+            if "bt_enabled" in changed:
+                self.bt.apply_enabled()
+            if "bt_name" in changed:
+                self.bt.apply_name()
+        except BTError as e:
+            raise ValueError(str(e))
         return changed
 
     def set_volume(self, volume):
         self.settings.update(volume=volume)
         self.player.set_audio(volume=self.settings.get("volume"))
+        self.bt.restart_capture()
 
     def set_modes(self, shuffle=None, repeat=None):
         vals = {}
@@ -187,6 +228,55 @@ class RadioApp:
         s = self.settings.all()
         self.player.set_modes(shuffle=s["shuffle"] if shuffle is not None else None,
                               repeat=s["repeat"] if repeat is not None else None)
+
+    # ------------------------------------------------------------------ live audio
+    def _wanted_on_air(self):
+        if not self.tx.wanted:
+            self.tx.turn_on()
+
+    def library_takeover(self):
+        """Before a song-library action: the library gets the air back from the
+        phone. While someone is talking on the microphone, songs must wait."""
+        if self.player.live_kind() == "ptt":
+            raise ValueError("في حدا عم يحكي على الهوا هلأ. استنى يخلص")
+        self.bt.suppress()
+
+    def ptt_start(self, client=""):
+        src = LiveSource("ptt", label="مايك مباشر", target=0.25, max_delay=0.8)
+        src.sid = secrets.token_urlsafe(9)
+        src.client = client
+        with self._ptt_lock:
+            self._ptt = src            # last one to press the button wins
+        self._wanted_on_air()
+        self.player.begin_live(src)
+        log.info("push-to-talk on air (%s)", client or "?")
+        return src.sid
+
+    def _ptt_session(self, sid):
+        src = self._ptt
+        if src is None or src.sid != sid or src.closed:
+            raise LiveEnded()
+        return src
+
+    def ptt_push(self, sid, pcm_mono):
+        """44.1 kHz signed 16-bit mono from the browser."""
+        self._ptt_session(sid).push(mono_to_stereo(pcm_mono))
+
+    def ptt_end(self, sid):
+        try:
+            self._ptt_session(sid).finish()
+            log.info("push-to-talk finished")
+        except LiveEnded:
+            pass
+
+    def _ptt_watchdog(self):
+        src = self._ptt
+        if src is None or src.closed:
+            return
+        now = time.monotonic()
+        if now - src.last_push > PTT_IDLE or now - src.created > PTT_MAX:
+            log.info("push-to-talk ended (no audio from the phone)")
+            src.finish()
 
     def delete_track(self, tid):
         ok = self.library.delete(tid)
@@ -200,13 +290,15 @@ class RadioApp:
         snap = self.player.snapshot()
         gpio = system.gpio4_function() if tx["status"] in ("on_air", "starting") else None
         recent = time.monotonic() - self.feeder.last_write < 2.0
+        live = snap["live"]
         return {
             "transmitter": tx["status"] == "on_air",
             "gpio": gpio,                     # 'GPCLK0' = clock really goes out of pin 7
             "pin_ok": gpio in ("GPCLK0", "DEV"),
             "audio_flowing": recent,
             "level": round(self.feeder.level, 3),
-            "playing": snap["state"] == "playing",
+            "playing": snap["state"] == "playing" or bool(live),
+            "live": live and live["kind"],
             "frequency": tx["frequency"],
             "error": tx["error"],
             "log": list(self.tx.output)[-12:],
@@ -221,9 +313,10 @@ class RadioApp:
             "settings": {k: s[k] for k in (
                 "frequency", "station_name", "radiotext", "rds_song_text", "ps_scroll",
                 "pi_code", "ppm", "volume", "preemphasis", "transmit_on_boot", "autoplay",
-                "shuffle", "repeat")},
+                "shuffle", "repeat", "bt_enabled", "bt_takeover", "bt_name", "captive_mode")},
             "rds": {"ps": self._ps_shown or s["station_name"], "rt": self.tx.params.get("rt", "")},
             "library": {"version": self.library.version, "count": len(self.library.ids()),
                         "scanning": self.library.scanning, "imported": self.imported},
+            "bt": self.bt.summary(),
             "time": time.time(),
         }

@@ -54,6 +54,7 @@ main { max-width: 560px; margin: 0 auto; padding: 14px 16px; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px;
   border-radius: 12px; border: 1px solid var(--line); background: var(--card2); text-decoration: none; font-weight: 600;
+  color: var(--text);
 }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .btn.danger { background: transparent; color: var(--bad); border-color: rgba(255, 93, 93, .5); }
@@ -225,3 +226,76 @@ audio { width: 100%; margin: 10px 0; }
   .stepper { grid-template-columns: 1fr 1fr 1.2fr 1fr 1fr; gap: 4px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---------- live audio card (Bluetooth / microphone) ---------- */
+.live { border-color: rgba(80, 140, 255, .35); background: linear-gradient(180deg, rgba(60, 110, 230, .12), var(--card) 70%); }
+.live.on-air { border-color: rgba(255, 93, 93, .55); background: linear-gradient(180deg, rgba(255, 93, 93, .12), var(--card) 70%); }
+.live-head { display: flex; gap: 12px; align-items: center; }
+.live-ico { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: rgba(80, 140, 255, .18); color: #9fc0ff; flex: none; }
+.live.on-air .live-ico { background: rgba(255, 93, 93, .18); color: #ffb0b0; }
+.live-text { flex: 1; min-width: 0; }
+.live-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-sub { font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-badge { font-size: 12px; font-weight: 700; color: #fff; background: var(--bad); border-radius: 99px; padding: 3px 10px; animation: blink 1.4s infinite; }
+.bt-ctl { justify-content: center; gap: 22px; margin-top: 10px; }
+.icon-btn.big { width: 56px; height: 56px; background: var(--card2); }
+
+.quick-btn:nth-child(1) svg { color: var(--bad); }
+.quick-btn:nth-child(2) svg { color: #7fa8ff; }
+
+/* ---------- push-to-talk ---------- */
+.ptt-status { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 6px 0 12px; font-size: 18px; }
+.ptt-status .dot-live { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+.ptt-status.live .dot-live { background: var(--bad); animation: ping 1.2s infinite; }
+.ptt-status.lost b { color: var(--warn); }
+.ptt-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  width: 190px; height: 190px; margin: 6px auto 14px; border-radius: 50%; border: 0;
+  background: radial-gradient(circle at 50% 35%, #3a2a10, #1d1a14); color: var(--accent);
+  box-shadow: 0 0 0 6px rgba(245, 165, 36, .14), 0 10px 40px rgba(0, 0, 0, .45);
+  font-weight: 700; font-size: 15px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  transition: transform .12s, box-shadow .2s, background .2s;
+}
+.ptt-btn svg { width: 54px; height: 54px; }
+.ptt-btn.wait { opacity: .7; }
+.ptt-btn.live { background: radial-gradient(circle at 50% 35%, #ff6b6b, #b52a2a); color: #fff; transform: scale(1.04);
+  box-shadow: 0 0 0 10px rgba(255, 93, 93, .22), 0 0 50px rgba(255, 93, 93, .45); }
+
+/* ---------- Bluetooth panel ---------- */
+.bt-state { display: flex; gap: 12px; align-items: center; background: var(--card2); border-radius: 14px; padding: 12px; margin: 4px 0 10px; }
+.bt-state small { display: block; color: var(--muted); font-size: 13px; margin-top: 3px; line-height: 1.6; }
+.bt-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--line); color: var(--muted); flex: none; }
+.bt-state.on .bt-ico { background: rgba(80, 140, 255, .2); color: #9fc0ff; }
+.pairing { border: 1px dashed rgba(80, 140, 255, .6); border-radius: 14px; padding: 12px; margin: 10px 0; background: rgba(60, 110, 230, .08); }
+.pairing-head { display: flex; gap: 10px; align-items: center; }
+.pairing-head b { flex: 1; }
+.pulse { width: 12px; height: 12px; border-radius: 50%; background: #5b8cff; box-shadow: 0 0 0 0 rgba(91, 140, 255, .7); animation: pulse-b 1.5s infinite; }
+@keyframes pulse-b { 0% { box-shadow: 0 0 0 0 rgba(91, 140, 255, .6); } 100% { box-shadow: 0 0 0 12px rgba(91, 140, 255, 0); } }
+.pairing .steps { margin: 8px 0 4px; }
+.sub-h { font-size: 14px; color: var(--muted); font-weight: 600; margin: 16px 0 6px; }
+.devs { list-style: none; margin: 0; padding: 0; }
+.devs li { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.dev-ico { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--card2); color: var(--muted); flex: none; }
+.devs li.on .dev-ico { color: #9fc0ff; background: rgba(80, 140, 255, .18); }
+.dev-main { flex: 1; min-width: 0; }
+.dev-main b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dev-main small { color: var(--muted); font-size: 12px; }
+.devs li.on .dev-main small { color: #9fc0ff; }
+
+/* ---------- page link ---------- */
+.url-box { display: flex; gap: 10px; align-items: center; justify-content: space-between; background: #0b0d10; border: 1px solid var(--line); border-radius: 12px; padding: 8px 8px 8px 12px; margin: 6px 0 4px; }
+.url-box .url { font-size: 18px; color: var(--accent); letter-spacing: .3px; word-break: break-all; user-select: all; -webkit-user-select: all; }
+.url-box .btn svg { width: 18px; height: 18px; }
+
+/* ---------- welcome page ---------- */
+body.welcome { padding-bottom: 24px; }
+.hero { text-align: center; padding: 18px 8px 6px; }
+.hero-icon { width: 74px; height: 74px; margin: 0 auto 10px; border-radius: 22px; display: grid; place-items: center; background: linear-gradient(135deg, #3b2a0c, #20242d); color: var(--accent); box-shadow: 0 10px 30px rgba(245, 165, 36, .18); }
+.hero-icon svg { width: 38px; height: 38px; }
+.hero h1 { font-size: 22px; margin: 0 0 10px; }
+.hero .air { display: inline-flex; }
+.hero .now-line { color: var(--muted); font-size: 14px; margin-top: 8px; }
+.card h2 svg { width: 20px; height: 20px; vertical-align: -4px; margin-inline-end: 4px; color: var(--accent); }
+.btn.big { min-height: 56px; font-size: 18px; }
+.done-panel { text-align: center; padding: 26px 16px; }
+.done-panel .big-check { width: 78px; height: 78px; margin: 0 auto 12px; border-radius: 50%; display: grid; place-items: center; background: rgba(52, 199, 123, .16); color: var(--good); font-size: 40px; font-weight: 800; }

@@ -20,6 +20,11 @@ DEFAULTS = {
     "repeat": "all",             # "off" | "all" | "one"
     "last_track": None,
     "last_position": 0.0,
+    "bt_enabled": True,          # the Pi is a Bluetooth speaker for the phone
+    "bt_takeover": True,         # phone audio takes the air automatically
+    "bt_name": "PiRadio",        # name the phone shows in its Bluetooth list
+    "bt_last": None,             # last connected phone (reconnected after boot)
+    "captive_mode": "once",      # welcome page: "once" per phone, or "always"
 }
 
 PS_RE = re.compile(r"^[ -~]{1,8}$")      # printable ASCII, 1..8 chars
@@ -54,7 +59,8 @@ def validate(key, value):
         if len(v) > 64:
             raise SettingsError("النص لازم يكون 64 حرف أو أقل")
         return v
-    if key in ("rds_song_text", "ps_scroll", "transmit_on_boot", "autoplay", "shuffle"):
+    if key in ("rds_song_text", "ps_scroll", "transmit_on_boot", "autoplay", "shuffle",
+               "bt_enabled", "bt_takeover"):
         return bool(value)
     if key == "pi_code":
         v = str(value).strip().upper()
@@ -84,6 +90,18 @@ def validate(key, value):
         v = str(value)
         if v not in ("off", "all", "one"):
             raise SettingsError("وضع التكرار غير صحيح")
+        return v
+    if key == "bt_name":
+        v = " ".join(str(value).split())
+        if not 1 <= len(v) <= 30 or any(ord(c) < 32 for c in v):
+            raise SettingsError("اسم البلوتوث: من 1 إلى 30 حرف")
+        return v
+    if key == "bt_last":
+        return None if value is None else str(value).upper()[:17]
+    if key == "captive_mode":
+        v = str(value)
+        if v not in ("once", "always"):
+            raise SettingsError("قيمة صفحة الترحيب غير صحيحة")
         return v
     if key == "last_track":
         return None if value is None else str(value)

@@ -145,3 +145,17 @@ def gpio4_function():
                 m = re.search(r"func=(\w+)", out) or re.search(r"=\s*(\w+)\s*$", out)
                 return m.group(1) if m else out
     return None
+
+
+def client_id(ip):
+    """Stable id of a phone on the hotspot: its Wi-Fi MAC address (phones keep
+    one private address per network), or the IP when the MAC is unknown."""
+    try:
+        with open("/proc/net/arp") as f:
+            for line in f.read().splitlines()[1:]:
+                cols = line.split()
+                if len(cols) >= 4 and cols[0] == ip and cols[3] != "00:00:00:00:00:00":
+                    return "mac:" + cols[3].lower()
+    except OSError:
+        pass
+    return "ip:" + str(ip)

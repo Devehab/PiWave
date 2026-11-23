@@ -26,6 +26,10 @@
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
   <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8M7 6.3a7.5 7.5 0 1 0 10 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-bt" viewBox="0 0 24 24"><path d="M7 7.5l10 9-5 4.5V3l5 4.5-10 9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-talk" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M14.5 7V2.5M9.5 11h5M9.5 14h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 9.5a5 5 0 0 0 0 5M20 9.5a5 5 0 0 1 0 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-vol" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 </svg>
 
@@ -58,6 +62,23 @@
     <p class="car-hint" id="car-hint"></p>
   </div>
 
+  <div class="card live hidden" id="live-card">
+    <div class="live-head">
+      <span class="live-ico" id="live-ico"><svg><use href="#i-bt"/></svg></span>
+      <div class="live-text">
+        <div class="live-title" id="live-title"></div>
+        <div class="muted live-sub" id="live-sub"></div>
+      </div>
+      <span class="live-badge hidden" id="live-badge">على الهوا</span>
+    </div>
+    <div class="controls bt-ctl hidden" dir="ltr" id="bt-ctl">
+      <button class="icon-btn" type="button" data-btmedia="prev" title="السابقة بالتلفون"><svg><use href="#i-prev"/></svg></button>
+      <button class="icon-btn big" type="button" data-btmedia="toggle" title="تشغيل/إيقاف بالتلفون"><svg><use href="#i-play"/></svg></button>
+      <button class="icon-btn" type="button" data-btmedia="next" title="التالية بالتلفون"><svg><use href="#i-next"/></svg></button>
+    </div>
+    <button class="btn ghost block hidden" id="live-back" type="button"><svg><use href="#i-music"/></svg> رجّع أغاني الجهاز</button>
+  </div>
+
   <div class="card now">
     <div class="now-head">
       <div class="art" id="art"><svg><use href="#i-music"/></svg><div class="eq"><i></i><i></i><i></i><i></i></div></div>
@@ -87,6 +108,8 @@
   </div>
 
   <div class="quick">
+    <button id="q-talk" class="card quick-btn" type="button"><svg><use href="#i-talk"/></svg><span>احكي مباشر<small>زي اللاسلكي</small></span></button>
+    <button id="q-bt" class="card quick-btn" type="button"><svg><use href="#i-bt"/></svg><span>بلوتوث<small id="q-bt-sub">وصّل تلفونك</small></span></button>
     <button id="q-record" class="card quick-btn" type="button"><svg><use href="#i-mic"/></svg><span>سجّل صوتك<small>وابعثه على الراديو</small></span></button>
     <button id="q-tone" class="card quick-btn" type="button"><svg><use href="#i-bell"/></svg><span>نغمة اختبار<small>تأكد إنك سامع</small></span></button>
   </div>
@@ -185,6 +208,31 @@
   </div>
 
   <div class="card">
+    <h2>البلوتوث</h2>
+    <p class="muted small-text">الجهاز بيطلع بتلفونك كسماعة اسمها <b id="s-bt-name-show">PiRadio</b>. أي صوت بتشغله بالتلفون بيطلع على راديو السيارة.</p>
+    <button id="s-bt-open" class="btn primary block" type="button"><svg><use href="#i-bt"/></svg> إدارة البلوتوث والاقتران</button>
+  </div>
+
+  <div class="card">
+    <h2>فتح الصفحة</h2>
+    <div class="url-box"><b dir="ltr" class="url" id="u-url">http://192.168.4.1</b><button id="u-copy" class="btn small" type="button"><svg><use href="#i-copy"/></svg> نسخ الرابط</button></div>
+    <p class="muted small-text">افتح الرابط بأي متصفح وإنت متصل بشبكة الراديو. نصيحة: بسفاري اضغط مشاركة ← «إضافة إلى الشاشة الرئيسية»، وبكروم ⋮ ← «إضافة إلى الشاشة الرئيسية»، وبتصير تفتحها بكبسة.</p>
+    <label class="field"><span>صفحة الترحيب اللي بتطلع لما تتصل بالواي فاي</span>
+      <select id="s-captive">
+        <option value="once">مرة وحدة لكل تلفون (بعد «تم» ما بترجع)</option>
+        <option value="always">كل مرة (نت الموبايل بيضل شغال)</option>
+      </select></label>
+    <details><summary class="muted">شو الفرق؟</summary>
+      <p class="small-text">«مرة وحدة»: بعد ما تضغط «تم» بصفحة الترحيب، التلفون بيعتبر شبكة الراديو «متصلة»، فالصفحة ما بتطلع مرة ثانية وبتقدر تفتح الرابط بالمتصفح بسهولة. بس طول ما التلفون متصل بالشبكة، تطبيقات النت (الخرائط، سبوتيفاي) ممكن ما تشتغل، لأنه الراديو مش متصل بالإنترنت. إذا بدك نت، افصل الواي فاي (البلوتوث بيضل شغال).</p>
+      <p class="small-text">«كل مرة»: الصفحة بتطلع كل ما تتصل، والتلفون بيضل يستعمل بيانات الموبايل للنت.</p>
+    </details>
+    <div class="row">
+      <a class="btn ghost" href="/welcome">اعرض صفحة الترحيب</a>
+      <button id="u-reset" class="btn ghost" type="button">رجّعها لكل التلفونات</button>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>شبكة الواي فاي</h2>
     <label class="field"><span>اسم الشبكة</span><input id="w-ssid" dir="ltr" maxlength="32" autocomplete="off"></label>
     <label class="field"><span>كلمة السر (8 أحرف على الأقل)</span><input id="w-pass" dir="ltr" maxlength="63" autocomplete="off"></label>
@@ -260,8 +308,37 @@
   </div>
 </div>
 
+<!-- ============================ BLUETOOTH SHEET ============================ -->
+<div id="bt-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="bt-title">
+  <div class="sheet-body card">
+    <div class="sheet-head"><h2 id="bt-title">البلوتوث</h2><button class="x" id="bt-close" type="button" aria-label="إغلاق">✕</button></div>
+    <div id="bt-box" class="bt-box"><p class="muted">…</p></div>
+  </div>
+</div>
+
+<!-- ============================ PUSH-TO-TALK SHEET ============================ -->
+<div id="ptt" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="ptt-title">
+  <div class="sheet-body card">
+    <div class="sheet-head"><h2 id="ptt-title">احكي مباشر على الراديو</h2><button class="x" id="ptt-close" type="button" aria-label="إغلاق">✕</button></div>
+    <div id="ptt-ok">
+      <div class="ptt-status" id="ptt-status"><span class="dot-live"></span><b id="ptt-state">جاهز</b><span dir="ltr" class="muted" id="ptt-time"></span></div>
+      <div class="rec-wave"><i id="ptt-level"></i></div>
+      <button id="ptt-btn" class="ptt-btn" type="button"><svg><use href="#i-mic"/></svg><span id="ptt-label">اضغط مطوّل واحكي</span></button>
+      <label class="switch"><input type="checkbox" id="ptt-latch"><span>بدون ما أضل ضاغط: كبسة بتبدأ وكبسة بتوقف</span></label>
+      <p class="muted small-text">صوتك بيطلع على الراديو بعد أقل من ثانية، والأغنية بتوقف وبترجع لحالها لما تخلص. إذا سمعت صدى، وطّي صوت السيارة شوي.</p>
+    </div>
+    <div id="ptt-insecure" class="hidden">
+      <p>المتصفح بيسمح بالمايكروفون بس على <b>الرابط الآمن</b> للجهاز.</p>
+      <a id="ptt-https" class="btn primary block" href="#">افتح الرابط الآمن</a>
+      <p class="muted small-text">رح يطلعلك تحذير إنه «الاتصال مش خاص». هاد طبيعي لأنه الجهاز تبعك ومش موقع على الإنترنت. اختار <b>Show Details ← visit this website</b> بالآيفون، أو <b>Advanced ← Proceed</b> بالأندرويد.</p>
+    </div>
+    <div id="ptt-old" class="hidden"><p>المتصفح هاد ما بيدعم البث المباشر من المايك. حدّث المتصفح، أو استعمل «سجّل صوتك» بدالها.</p></div>
+  </div>
+</div>
+
 <div id="overlay" class="overlay hidden"><div class="spinner"></div><p id="overlay-text"></p></div>
 <div id="toast" class="toast hidden" role="alert"></div>
+<script src="/static/bt.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

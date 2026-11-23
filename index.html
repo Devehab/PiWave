@@ -1,0 +1,1074 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PiWave — Your car's private FM station, from a Raspberry Pi</title>
+<meta name="description" content="PiWave turns a ~$15 Raspberry Pi Zero 2 W and one 20 cm wire into a tiny private FM station for your car: your music, your voice, Bluetooth and RDS, controlled from your phone with no internet.">
+<meta name="theme-color" content="#0b0c10">
+<meta name="color-scheme" content="dark">
+<meta property="og:type" content="website">
+<meta property="og:title" content="PiWave — Your car's private FM station">
+<meta property="og:description" content="A Raspberry Pi + a 20 cm wire = your own FM station for a car that only has FM. Music, live voice, Bluetooth, RDS. No internet needed.">
+<meta property="og:url" content="https://devehab.github.io/PiWave/">
+<meta property="og:site_name" content="PiWave">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0c10'/%3E%3Cpath d='M9 22a10 10 0 0 1 0-12M23 10a10 10 0 0 1 0 12M12.5 19a5 5 0 0 1 0-6M19.5 13a5 5 0 0 1 0 6' fill='none' stroke='%23f5a524' stroke-width='2.2' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='16' r='2.2' fill='%23f5a524'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Share+Tech+Mono&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0c10; --bg2: #101218; --card: #14171e; --card2: #1a1e27; --line: #272c36;
+  --text: #eef0f4; --muted: #a3aab7; --dim: #6f7686;
+  --amber: #f5a524; --amber2: #ffcf70; --ink: #1a1203;
+  --good: #34c77b; --bad: #ff6b6b; --blue: #7aa7ff; --violet: #b18cff;
+  --r: 20px;
+  --f-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-head: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --f-lcd: "Share Tech Mono", ui-monospace, monospace;
+}
+html[lang="ar"] {
+  --f-body: "IBM Plex Sans Arabic", "Inter", system-ui, sans-serif;
+  --f-head: "IBM Plex Sans Arabic", "Space Grotesk", system-ui, sans-serif;
+}
+html[lang="en"] [data-l="ar"], html[lang="ar"] [data-l="en"] { display: none !important; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--f-body); line-height: 1.6; overflow-x: hidden; }
+html[lang="ar"] body { line-height: 1.85; }
+a { color: var(--amber2); }
+img, svg { max-width: 100%; }
+::selection { background: rgba(245, 165, 36, .35); }
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; border-radius: 8px; }
+.skip { position: absolute; inset-inline-start: 16px; top: -60px; z-index: 100; background: var(--amber); color: var(--ink); padding: 10px 14px; border-radius: 10px; font-weight: 700; }
+.skip:focus { top: 12px; }
+.wrap { width: 100%; max-width: 1140px; margin: 0 auto; padding: 0 16px; }
+@media (min-width: 720px) { .wrap { padding: 0 28px; } }
+
+/* ------------------------------------------------ header + scroll tuner */
+.top { position: sticky; top: 0; z-index: 50; background: rgba(11, 12, 16, .82); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+.top-row { display: flex; align-items: center; gap: 14px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font-family: var(--f-head); font-weight: 700; font-size: 19px; letter-spacing: -.2px; }
+.brand svg { width: 30px; height: 30px; }
+.presets-nav { display: none; gap: 6px; margin-inline-start: auto; }
+.presets-nav a { display: flex; align-items: center; gap: 7px; text-decoration: none; color: var(--muted); font-size: 13px; padding: 6px 10px; border-radius: 10px; border: 1px solid transparent; white-space: nowrap; }
+.presets-nav a b { font-family: var(--f-lcd); font-size: 12px; width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; background: var(--card2); color: var(--amber); border: 1px solid var(--line); }
+.presets-nav a:hover, .presets-nav a.on { color: var(--text); border-color: var(--line); background: var(--card); }
+.presets-nav a.on b { background: var(--amber); color: var(--ink); }
+.tools { display: flex; align-items: center; gap: 8px; margin-inline-start: auto; }
+@media (min-width: 1020px) { .presets-nav { display: flex; } .tools { margin-inline-start: 10px; } }
+.lang { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.lang button { font: 600 13px/1 var(--f-body); color: var(--muted); background: none; border: 0; padding: 8px 11px; border-radius: 9px; cursor: pointer; }
+.lang button[lang="ar"] { font-family: "IBM Plex Sans Arabic", sans-serif; }
+.lang button[aria-pressed="true"] { background: var(--amber); color: var(--ink); }
+.gh { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+.gh svg { width: 20px; height: 20px; }
+.tuner { position: relative; height: 22px; border-top: 1px solid var(--line); }
+.tuner .scale { position: absolute; inset: 0 16px; background:
+  repeating-linear-gradient(90deg, rgba(255,255,255,.18) 0 1px, transparent 1px 100%) 0 100% / calc(100% / 40) 6px no-repeat,
+  repeating-linear-gradient(90deg, rgba(255,255,255,.28) 0 1px, transparent 1px 100%) 0 100% / calc(100% / 10) 10px no-repeat; }
+.tuner .scale { background-repeat: repeat-x; }
+.tuner .needle { position: absolute; top: 2px; bottom: 0; width: 2px; background: var(--amber); box-shadow: 0 0 10px var(--amber); left: 16px; transition: left .12s linear; }
+.tuner .tag { position: absolute; top: 3px; font: 11px/1 var(--f-lcd); color: var(--amber); white-space: nowrap; letter-spacing: .5px; }
+
+/* ------------------------------------------------ hero */
+.hero { position: relative; padding: 54px 0 70px; overflow: hidden; }
+.hero::before { content: ""; position: absolute; inset: -20% -10% auto; height: 120%; background:
+  radial-gradient(60% 50% at 78% 30%, rgba(245, 165, 36, .16), transparent 70%),
+  radial-gradient(40% 40% at 10% 0%, rgba(122, 167, 255, .08), transparent 70%); pointer-events: none; }
+.hero-grid { position: relative; display: grid; gap: 44px; align-items: center; }
+@media (min-width: 960px) { .hero-grid { grid-template-columns: 1.05fr .95fr; gap: 56px; } .hero { padding: 80px 0 96px; } }
+.eyebrow { display: inline-flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; padding: 0; list-style: none; }
+.eyebrow li { font: 500 12px/1 var(--f-mono); color: var(--amber2); border: 1px solid rgba(245, 165, 36, .35); background: rgba(245, 165, 36, .07); padding: 7px 10px; border-radius: 99px; letter-spacing: .3px; }
+html[lang="ar"] .eyebrow li { font-family: var(--f-body); font-size: 13px; }
+h1 { font-family: var(--f-head); font-size: clamp(36px, 7.4vw, 64px); line-height: 1.04; letter-spacing: -1.5px; margin: 0 0 20px; }
+html[lang="ar"] h1 { letter-spacing: 0; line-height: 1.3; font-size: clamp(32px, 6.6vw, 56px); }
+h1 .glow { color: var(--amber); text-shadow: 0 0 40px rgba(245, 165, 36, .45); }
+.lead { font-size: clamp(17px, 2.3vw, 20px); color: #cfd4dd; margin: 0 0 30px; max-width: 590px; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 50px; padding: 0 22px; border-radius: 14px; font-weight: 700; font-size: 16px; text-decoration: none; border: 1px solid var(--line); color: var(--text); background: var(--card); transition: transform .15s, box-shadow .2s, background .2s; }
+.btn svg { width: 20px; height: 20px; }
+.btn.primary { background: var(--amber); color: var(--ink); border-color: var(--amber); box-shadow: 0 10px 34px rgba(245, 165, 36, .32); }
+.btn:hover { transform: translateY(-2px); }
+.btn.primary:hover { box-shadow: 0 14px 40px rgba(245, 165, 36, .45); }
+.hero-meta { display: flex; flex-wrap: wrap; gap: 18px 26px; margin-top: 34px; color: var(--muted); font-size: 14px; }
+.hero-meta b { display: block; text-align: start; color: var(--text); font-family: var(--f-head); font-size: 22px; }
+html[lang="ar"] .hero-meta b { font-size: 20px; }
+
+/* the radio faceplate */
+.radio-wrap { position: relative; display: grid; justify-items: center; }
+.rings { position: absolute; inset: -30% -20%; pointer-events: none; display: grid; place-items: center; }
+.rings i { position: absolute; width: 60%; aspect-ratio: 1; border-radius: 50%; border: 1.5px solid rgba(245, 165, 36, .35); animation: ring 4.2s cubic-bezier(.2, .6, .3, 1) infinite; opacity: 0; }
+.rings i:nth-child(2) { animation-delay: 1.4s; } .rings i:nth-child(3) { animation-delay: 2.8s; }
+@keyframes ring { 0% { transform: scale(.55); opacity: .9; } 100% { transform: scale(1.6); opacity: 0; } }
+.radio { position: relative; width: 100%; max-width: 470px; padding: 18px; border-radius: 26px; background: linear-gradient(160deg, #23262f, #14161c 55%, #101217); border: 1px solid #343946; box-shadow: 0 40px 80px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .06); }
+.radio-top { display: flex; align-items: center; gap: 14px; }
+.knob { flex: none; width: 54px; height: 54px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #4a4f5c, #1d2027 70%); border: 1px solid #3c414d; box-shadow: 0 6px 14px rgba(0, 0, 0, .5), inset 0 -3px 6px rgba(0, 0, 0, .4); position: relative; }
+.knob::after { content: ""; position: absolute; left: 50%; top: 6px; width: 3px; height: 13px; margin-left: -1.5px; border-radius: 2px; background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.knob.small { width: 40px; height: 40px; } .knob.small::after { height: 9px; top: 5px; background: #c9ced8; box-shadow: none; }
+.lcd { position: relative; flex: 1; min-width: 0; padding: 12px 14px; border-radius: 14px; background: radial-gradient(120% 140% at 50% 0%, #2a1d07, #120d05 70%); border: 1px solid #3a2a0d; box-shadow: inset 0 0 24px rgba(0, 0, 0, .7); overflow: hidden; color: var(--amber); font-family: var(--f-lcd); }
+.lcd::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .18) 0 1px, transparent 1px 3px); pointer-events: none; }
+.lcd .noise { position: absolute; inset: 0; opacity: 0; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E"); mix-blend-mode: screen; }
+.radio.tuning .lcd .noise { opacity: .35; animation: noise .2s steps(3) infinite; }
+@keyframes noise { 0% { background-position: 0 0; } 33% { background-position: 40px 17px; } 66% { background-position: -23px 51px; } }
+.ind { display: flex; gap: 8px; font-size: 11px; letter-spacing: 1px; }
+.ind span { opacity: .22; transition: opacity .3s; }
+.radio.locked .ind span { opacity: 1; text-shadow: 0 0 8px rgba(245, 165, 36, .8); }
+.ind .fm { opacity: 1; margin-inline-start: auto; }
+.readout { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 0; text-shadow: 0 0 18px rgba(245, 165, 36, .55); }
+.readout span { font-size: clamp(46px, 11vw, 62px); line-height: 1; letter-spacing: 1px; }
+.readout small { font-size: 15px; opacity: .8; }
+.ps { font-size: 22px; letter-spacing: 3px; min-height: 28px; margin-top: 6px; }
+.rt { position: relative; overflow: hidden; white-space: nowrap; font-size: 14px; opacity: .85; min-height: 20px; }
+.rt span { display: inline-block; padding-inline-start: 100%; animation: marquee 9s linear infinite; }
+.radio:not(.locked) .rt span, .radio:not(.locked) .ps { visibility: hidden; }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+.dial { position: relative; height: 58px; margin: 16px 0 14px; border-radius: 12px; background: linear-gradient(#0d0f13, #171a21); border: 1px solid #2c313c; overflow: hidden; }
+.dial .ticks { position: absolute; inset: 0 14px 22px; background:
+  repeating-linear-gradient(90deg, rgba(255,255,255,.55) 0 1.5px, transparent 1.5px 100%) 0 0 / calc(100% / 5) 14px repeat-x,
+  repeating-linear-gradient(90deg, rgba(255,255,255,.25) 0 1px, transparent 1px 100%) 0 0 / calc(100% / 20) 8px repeat-x; }
+.dial .nums { position: absolute; left: 14px; right: 14px; bottom: 6px; display: flex; justify-content: space-between; font: 11px/1 var(--f-lcd); color: #8a909c; }
+.dial .nums span { width: 0; display: flex; justify-content: center; }
+.dial .needle { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: linear-gradient(#ff8a3d, var(--amber)); box-shadow: 0 0 14px var(--amber), 0 0 3px #fff; border-radius: 2px; }
+.dial-inner { position: absolute; left: 14px; right: 14px; top: 0; bottom: 0; }
+.presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.presets button { position: relative; min-height: 46px; border-radius: 11px; border: 1px solid #343a46; background: linear-gradient(#262a33, #1a1d24); color: #cdd2db; font: 600 12px/1.2 var(--f-body); cursor: pointer; box-shadow: 0 3px 0 #0b0c0f; transition: transform .08s, box-shadow .08s, color .2s; padding: 6px 4px; }
+.presets button b { display: block; font: 15px/1 var(--f-lcd); color: var(--amber); margin-bottom: 3px; }
+.presets button:active { transform: translateY(2px); box-shadow: 0 1px 0 #0b0c0f; }
+.presets button[aria-pressed="true"] { color: #fff; border-color: rgba(245, 165, 36, .6); box-shadow: 0 3px 0 #0b0c0f, 0 0 16px rgba(245, 165, 36, .25); }
+.radio-cap { margin: 14px 0 0; font-size: 13px; color: var(--dim); text-align: center; }
+
+/* ------------------------------------------------ sections */
+section { position: relative; padding: 76px 0; scroll-margin-top: 82px; }
+section + section { border-top: 1px solid var(--line); }
+.sec-head { position: relative; margin-bottom: 34px; max-width: 760px; }
+.sec-head .ghost { position: absolute; top: -48px; inset-inline-end: -10px; font: 700 clamp(72px, 16vw, 150px)/1 var(--f-lcd); color: rgba(255, 255, 255, .03); pointer-events: none; user-select: none; }
+.station { display: inline-flex; align-items: center; gap: 10px; font: 600 12.5px/1 var(--f-mono); color: var(--amber); letter-spacing: .6px; text-transform: uppercase; margin-bottom: 14px; }
+html[lang="ar"] .station { font-family: var(--f-body); font-size: 14px; letter-spacing: 0; text-transform: none; }
+.station .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+.station .mhz { font-family: var(--f-lcd); font-size: 14px; padding: 4px 8px; border-radius: 7px; background: rgba(245, 165, 36, .1); border: 1px solid rgba(245, 165, 36, .3); }
+h2 { font-family: var(--f-head); font-size: clamp(28px, 5vw, 44px); line-height: 1.12; letter-spacing: -.8px; margin: 0 0 14px; }
+html[lang="ar"] h2 { letter-spacing: 0; line-height: 1.35; }
+.sub { color: var(--muted); font-size: 18px; margin: 0; }
+h3 { font-family: var(--f-head); font-size: 20px; margin: 0 0 8px; letter-spacing: -.2px; }
+html[lang="ar"] h3 { letter-spacing: 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 22px; }
+.card p { margin: 0; color: var(--muted); }
+.grid { display: grid; gap: 16px; }
+@media (min-width: 700px) { .grid.g2 { grid-template-columns: repeat(2, 1fr); } .grid.g3 { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 980px) { .grid.g3 { grid-template-columns: repeat(3, 1fr); } .grid.g4 { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 640px) and (max-width: 979px) { .grid.g4 { grid-template-columns: repeat(2, 1fr); } }
+.ico { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 16px; background: rgba(245, 165, 36, .1); color: var(--amber); border: 1px solid rgba(245, 165, 36, .25); }
+.ico svg { width: 24px; height: 24px; }
+.ico.red { background: rgba(255, 107, 107, .1); color: var(--bad); border-color: rgba(255, 107, 107, .25); }
+.ico.blue { background: rgba(122, 167, 255, .1); color: var(--blue); border-color: rgba(122, 167, 255, .25); }
+.ico.green { background: rgba(52, 199, 123, .1); color: var(--good); border-color: rgba(52, 199, 123, .25); }
+.ico.violet { background: rgba(177, 140, 255, .1); color: var(--violet); border-color: rgba(177, 140, 255, .25); }
+
+/* problem */
+.problem-grid { display: grid; gap: 16px; }
+@media (min-width: 900px) { .problem-grid { grid-template-columns: 1.1fr .9fr; align-items: stretch; } }
+.dash { position: relative; border-radius: var(--r); padding: 26px; background: linear-gradient(180deg, #17191f, #121419); border: 1px solid var(--line); overflow: hidden; }
+.dash-radio { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 18px; border-radius: 14px; background: #0c0d11; border: 1px solid #2a2e37; font-family: var(--f-lcd); color: #6f7686; }
+.dash-radio .lcd-mini { padding: 8px 14px; border-radius: 8px; background: #1a1406; color: var(--amber); letter-spacing: 2px; font-size: 20px; box-shadow: inset 0 0 12px rgba(0,0,0,.7); }
+.ports { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+.port { text-align: center; padding: 14px 6px; border-radius: 12px; border: 1px dashed #3a3f4a; color: var(--dim); font-size: 13px; position: relative; }
+.port b { display: block; font-family: var(--f-mono); font-size: 13px; color: #8b92a0; margin-bottom: 4px; }
+.port::after { content: ""; position: absolute; left: 14px; right: 14px; top: 50%; height: 2px; background: var(--bad); transform: rotate(-12deg); opacity: .7; }
+.checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.checklist li { display: flex; gap: 12px; align-items: flex-start; }
+.checklist li::before { content: "✕"; flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; background: rgba(255, 107, 107, .12); color: var(--bad); margin-top: 2px; }
+.checklist.ok li::before { content: "✓"; background: rgba(52, 199, 123, .14); color: var(--good); }
+.big-quote { font-family: var(--f-head); font-size: clamp(20px, 3vw, 26px); line-height: 1.35; margin: 0 0 18px; }
+
+/* solution */
+.solution { display: grid; gap: 28px; align-items: center; }
+@media (min-width: 900px) { .solution { grid-template-columns: .95fr 1.05fr; } }
+.equation { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-family: var(--f-head); font-size: clamp(18px, 2.6vw, 22px); font-weight: 700; margin-bottom: 22px; }
+.equation .pill { padding: 10px 16px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); }
+.equation .pill.hl { background: rgba(245, 165, 36, .12); border-color: rgba(245, 165, 36, .45); color: var(--amber2); }
+.equation .op { color: var(--dim); }
+
+/* how it works: signal path */
+.path { display: grid; gap: 0; }
+@media (min-width: 980px) { .path { grid-template-columns: 1fr 78px 1fr 78px 1fr 78px 1fr; align-items: stretch; } }
+.node { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; }
+.node .k { font: 600 11px/1 var(--f-mono); color: var(--dim); letter-spacing: .8px; text-transform: uppercase; margin-bottom: 12px; }
+html[lang="ar"] .node .k { font-family: var(--f-body); font-size: 12px; letter-spacing: 0; text-transform: none; }
+.node h3 { font-size: 18px; }
+.node p { margin: 0; color: var(--muted); font-size: 14.5px; }
+.node.pi { border-color: rgba(52, 199, 123, .4); background: linear-gradient(180deg, rgba(31, 92, 58, .25), var(--card)); }
+.node.car { border-color: rgba(245, 165, 36, .45); background: linear-gradient(180deg, rgba(245, 165, 36, .1), var(--card)); }
+.link { position: relative; display: grid; place-items: center; min-height: 56px; }
+.link .line { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: repeating-linear-gradient(180deg, var(--amber) 0 6px, transparent 6px 12px); background-size: 2px 12px; animation: flow-v 0.8s linear infinite; opacity: .8; }
+.link .lbl { position: relative; font: 600 11px/1.2 var(--f-mono); color: var(--amber2); background: var(--bg); padding: 4px 8px; border-radius: 8px; border: 1px solid rgba(245, 165, 36, .3); text-align: center; }
+html[lang="ar"] .link .lbl { font-family: var(--f-body); font-size: 12px; }
+@keyframes flow-v { to { background-position: 0 12px; } }
+@media (min-width: 980px) {
+  .link .line { left: 0; right: 0; top: 50%; bottom: auto; width: auto; height: 2px; margin: -1px 0 0; background: repeating-linear-gradient(90deg, var(--amber) 0 6px, transparent 6px 12px); background-size: 12px 2px; animation: flow-h 0.8s linear infinite; }
+  html[dir="rtl"] .link .line { animation-direction: reverse; }
+  .link .lbl { font-size: 10px; padding: 4px 6px; white-space: nowrap; }
+}
+@keyframes flow-h { to { background-position: 12px 0; } }
+.pi-art { display: block; width: 100%; height: auto; margin: 4px 0 12px; }
+.waves-mini { display: flex; gap: 4px; align-items: center; height: 26px; margin-bottom: 10px; }
+.waves-mini i { width: 4px; border-radius: 2px; background: var(--amber); animation: eq 1.1s ease-in-out infinite; }
+.waves-mini i:nth-child(2) { animation-delay: -.2s; } .waves-mini i:nth-child(3) { animation-delay: -.45s; } .waves-mini i:nth-child(4) { animation-delay: -.7s; } .waves-mini i:nth-child(5) { animation-delay: -.9s; }
+@keyframes eq { 0%, 100% { height: 6px; } 50% { height: 24px; } }
+.path-note { margin-top: 18px; color: var(--muted); font-size: 14.5px; }
+
+/* features */
+.feat { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 22px; transition: border-color .2s, transform .2s; }
+.feat:hover { border-color: rgba(245, 165, 36, .4); transform: translateY(-3px); }
+.feat p { margin: 0; color: var(--muted); font-size: 15px; }
+.feat .rds { display: inline-block; margin-top: 12px; font: 13px/1 var(--f-lcd); color: var(--amber); background: #1a1406; border: 1px solid #3a2a0d; padding: 6px 10px; border-radius: 8px; letter-spacing: 1.5px; direction: ltr; }
+
+/* boards */
+.boards { display: grid; gap: 14px; }
+@media (min-width: 860px) { .boards { grid-template-columns: repeat(2, 1fr); } }
+.board { border-radius: var(--r); padding: 22px; border: 1px solid var(--line); background: var(--card); }
+.board .badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; padding: 6px 12px; border-radius: 99px; margin-bottom: 14px; }
+.board .badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.board.t1 { border-color: rgba(52, 199, 123, .45); } .board.t1 .badge { color: var(--good); background: rgba(52, 199, 123, .12); }
+.board.t2 .badge { color: var(--amber2); background: rgba(245, 165, 36, .12); }
+.board.t3 .badge { color: var(--blue); background: rgba(122, 167, 255, .12); }
+.board.t4 { border-color: rgba(255, 107, 107, .35); } .board.t4 .badge { color: var(--bad); background: rgba(255, 107, 107, .12); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
+.chips li { font: 600 14px/1 var(--f-body); padding: 9px 12px; border-radius: 10px; background: var(--card2); border: 1px solid var(--line); direction: ltr; }
+.board p { margin: 0; color: var(--muted); font-size: 14.5px; }
+.os-note { margin-top: 16px; display: flex; gap: 12px; align-items: flex-start; padding: 16px 18px; border-radius: 16px; background: var(--bg2); border: 1px solid var(--line); color: var(--muted); font-size: 15px; }
+.os-note svg { flex: none; width: 22px; height: 22px; color: var(--blue); margin-top: 2px; }
+
+/* what you need */
+.need .card { display: flex; gap: 14px; align-items: flex-start; padding: 18px; }
+.need .ico { margin: 0; flex: none; }
+.need h3 { font-size: 16.5px; margin-bottom: 4px; }
+.need p { font-size: 14.5px; }
+
+/* install */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: st; }
+.step { position: relative; display: grid; grid-template-columns: 46px 1fr; gap: 0 18px; padding-bottom: 34px; }
+.step:last-child { padding-bottom: 0; }
+.step::before { counter-increment: st; content: counter(st); grid-row: 1 / span 3; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font: 700 20px/1 var(--f-lcd); background: var(--amber); color: var(--ink); box-shadow: 0 8px 24px rgba(245, 165, 36, .3); position: relative; z-index: 1; }
+.step::after { content: ""; position: absolute; top: 50px; bottom: 4px; inset-inline-start: 22px; width: 2px; background: linear-gradient(var(--amber), rgba(245, 165, 36, .08)); }
+.step:last-child::after { display: none; }
+.step h3 { margin-top: 10px; font-size: 21px; }
+.step-body { min-width: 0; color: var(--muted); }
+.step-body p { margin: 0 0 12px; }
+.step-body ul { margin: 0 0 12px; padding-inline-start: 20px; }
+.step-body li { margin: 4px 0; }
+.step-body b, .step-body strong { color: var(--text); }
+.or { display: flex; align-items: center; gap: 12px; color: var(--dim); font-size: 13px; font-weight: 700; margin: 14px 0; text-transform: uppercase; letter-spacing: 1px; }
+.or::before, .or::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+.code { position: relative; display: flex; align-items: center; gap: 10px; margin: 8px 0 12px; padding: 12px 12px 12px 16px; border-radius: 12px; background: #07080b; border: 1px solid #252a33; direction: ltr; }
+.code code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font: 14px/1.5 var(--f-mono); color: #e7e9ee; scrollbar-width: thin; }
+.code code::before { content: "$ "; color: var(--amber); }
+.code code.url::before { content: ""; }
+.copy { flex: none; display: inline-flex; align-items: center; gap: 6px; font: 600 12.5px/1 var(--f-body); color: var(--muted); background: var(--card2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; cursor: pointer; }
+.copy svg { width: 15px; height: 15px; }
+.copy.done { color: var(--good); border-color: rgba(52, 199, 123, .5); }
+@media (max-width: 560px) {
+  .step { grid-template-columns: 36px 1fr; gap: 0 12px; }
+  .step::before { width: 36px; height: 36px; font-size: 17px; border-radius: 11px; }
+  .step::after { inset-inline-start: 17px; top: 40px; }
+  .code { padding: 10px 10px 10px 12px; align-items: flex-start; }
+  .code code { white-space: pre-wrap; word-break: break-all; font-size: 13.5px; }
+}
+kbd, .k-inline { font: 600 13px/1 var(--f-mono); padding: 3px 7px; border-radius: 6px; background: var(--card2); border: 1px solid var(--line); color: var(--text); direction: ltr; unicode-bidi: isolate; white-space: nowrap; }
+.pin-card { margin: 10px 0 14px; padding: 16px; border-radius: 16px; background: #0c0e12; border: 1px solid var(--line); }
+.pin-card svg { display: block; width: 100%; max-width: 540px; height: auto; margin: 0 auto; }
+.warn-inline { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: rgba(255, 107, 107, .08); border: 1px solid rgba(255, 107, 107, .3); color: #ffd0d0; font-size: 14.5px; margin: 10px 0; }
+.warn-inline svg { flex: none; width: 20px; height: 20px; color: var(--bad); margin-top: 2px; }
+.creds { display: grid; gap: 10px; margin: 10px 0 12px; }
+@media (min-width: 560px) { .creds { grid-template-columns: repeat(3, 1fr); } }
+.cred { padding: 12px 14px; border-radius: 12px; background: var(--card2); border: 1px solid var(--line); }
+.cred span { display: block; font-size: 12.5px; color: var(--dim); }
+.cred b { font-family: var(--f-mono); font-size: 15px; color: var(--amber2); direction: ltr; unicode-bidi: isolate; }
+
+/* updates */
+.update-flow { display: grid; gap: 12px; }
+@media (min-width: 860px) { .update-flow { grid-template-columns: repeat(4, 1fr); } }
+.uf { padding: 18px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); }
+.uf .n { font: 700 13px/1 var(--f-lcd); color: var(--amber); margin-bottom: 8px; }
+.uf p { margin: 0; color: var(--muted); font-size: 14.5px; }
+.uf.roll { border-color: rgba(52, 199, 123, .4); }
+
+/* faq */
+.faq { display: grid; gap: 12px; max-width: 860px; }
+details.q { border-radius: 16px; background: var(--card); border: 1px solid var(--line); }
+details.q summary { cursor: pointer; list-style: none; padding: 18px 20px; font-weight: 700; font-size: 17px; display: flex; gap: 12px; align-items: center; }
+details.q summary::-webkit-details-marker { display: none; }
+details.q summary::after { content: "+"; margin-inline-start: auto; font: 400 24px/1 var(--f-mono); color: var(--amber); transition: transform .2s; }
+details.q[open] summary::after { transform: rotate(45deg); }
+details.q .a { padding: 0 20px 20px; color: var(--muted); }
+details.q .a p { margin: 0 0 10px; }
+.range { width: 100%; border-collapse: collapse; font-size: 14.5px; margin-top: 6px; }
+.range th, .range td { padding: 10px 8px; text-align: start; border-bottom: 1px solid var(--line); }
+.range th { color: var(--dim); font-weight: 600; font-size: 13px; }
+.range td:first-child { font-family: var(--f-mono); color: var(--text); white-space: nowrap; }
+.range tr.best td { background: rgba(52, 199, 123, .08); }
+.range .bar { display: block; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--good), var(--amber)); }
+.range tr.no .bar { background: var(--bad); }
+
+/* law */
+.law { position: relative; border-radius: 26px; padding: 30px 22px; background:
+  linear-gradient(135deg, rgba(255, 107, 107, .09), rgba(245, 165, 36, .06) 60%, transparent), var(--card);
+  border: 1px solid rgba(255, 107, 107, .35); overflow: hidden; }
+@media (min-width: 720px) { .law { padding: 40px; } }
+.law::before { content: ""; position: absolute; inset: 0 0 auto; height: 6px; background: repeating-linear-gradient(-45deg, var(--amber) 0 14px, #1b1b1b 14px 28px); opacity: .9; }
+.law-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 22px; }
+.law-head .ico { margin: 0; flex: none; width: 54px; height: 54px; }
+@media (max-width: 560px) { .law-head { flex-direction: column; gap: 12px; } }
+.law h2 { margin-bottom: 6px; }
+.law-list { list-style: none; margin: 0 0 28px; padding: 0; display: grid; gap: 14px; }
+@media (min-width: 900px) { .law-list { grid-template-columns: repeat(2, 1fr); } }
+.law-list li { display: flex; gap: 12px; padding: 16px; border-radius: 14px; background: rgba(0, 0, 0, .25); border: 1px solid var(--line); color: #d6dae2; }
+.law-list li svg { flex: none; width: 22px; height: 22px; color: var(--amber); margin-top: 3px; }
+.law-list li b { color: #fff; }
+.regs { display: grid; gap: 12px; }
+@media (min-width: 760px) { .regs { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1080px) { .regs { grid-template-columns: repeat(3, 1fr); } }
+.reg { padding: 18px; border-radius: 16px; background: rgba(0, 0, 0, .3); border: 1px solid var(--line); }
+.reg .where { font: 700 12px/1 var(--f-mono); color: var(--amber2); letter-spacing: .8px; text-transform: uppercase; margin-bottom: 8px; }
+html[lang="ar"] .reg .where { font-family: var(--f-body); font-size: 13px; letter-spacing: 0; text-transform: none; }
+.reg h3 { font-size: 17px; }
+.reg p { margin: 0; color: var(--muted); font-size: 14.5px; }
+.reg .num { font-family: var(--f-mono); color: var(--text); white-space: nowrap; direction: ltr; unicode-bidi: isolate; }
+.fine { margin: 22px 0 0; color: var(--dim); font-size: 13.5px; }
+
+/* footer */
+footer { border-top: 1px solid var(--line); padding: 40px 0 50px; color: var(--muted); font-size: 14.5px; }
+.foot { display: flex; flex-wrap: wrap; gap: 18px 30px; align-items: center; justify-content: space-between; }
+.foot .made { display: flex; align-items: center; gap: 10px; }
+.foot .made svg { width: 26px; height: 26px; color: var(--amber); }
+.foot a { color: var(--text); }
+
+/* reveal on scroll */
+.js .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+.js .reveal.in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .js .reveal { opacity: 1; transform: none; }
+  .rings { display: none; }
+  .rt span { padding-inline-start: 0; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main"><span data-l="en">Skip to content</span><span data-l="ar">انتقل إلى المحتوى</span></a>
+
+<!-- ======================================================== header -->
+<header class="top">
+  <div class="wrap top-row">
+    <a class="brand" href="#top" aria-label="PiWave">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#1a1406"/><path d="M9 22a10 10 0 0 1 0-12M23 10a10 10 0 0 1 0 12M12.5 19a5 5 0 0 1 0-6M19.5 13a5 5 0 0 1 0 6" fill="none" stroke="#f5a524" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="16" r="2.2" fill="#f5a524"/></svg>
+      <span>PiWave</span>
+    </a>
+    <nav class="presets-nav" aria-label="Sections">
+      <a href="#problem"><b>1</b><span data-l="en">Problem</span><span data-l="ar">المشكلة</span></a>
+      <a href="#solution"><b>2</b><span data-l="en">Solution</span><span data-l="ar">الحل</span></a>
+      <a href="#how"><b>3</b><span data-l="en">How it works</span><span data-l="ar">كيف يعمل</span></a>
+      <a href="#boards"><b>4</b><span data-l="en">Boards</span><span data-l="ar">الأجهزة</span></a>
+      <a href="#install"><b>5</b><span data-l="en">Install</span><span data-l="ar">التثبيت</span></a>
+      <a href="#law"><b>6</b><span data-l="en">The law</span><span data-l="ar">القانون</span></a>
+    </nav>
+    <div class="tools">
+      <div class="lang" role="group" aria-label="Language / اللغة">
+        <button type="button" lang="en" data-set-lang="en" aria-pressed="true">EN</button>
+        <button type="button" lang="ar" data-set-lang="ar" aria-pressed="false">عربي</button>
+      </div>
+      <a class="gh" href="https://github.com/Devehab/PiWave" aria-label="GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg></a>
+    </div>
+  </div>
+  <div class="tuner" dir="ltr" aria-hidden="true">
+    <div class="scale"></div>
+    <div class="needle" id="tn"></div>
+    <span class="tag" id="tt">88.0 FM</span>
+  </div>
+</header>
+
+<main id="main">
+<!-- ======================================================== hero -->
+<div class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div class="reveal">
+      <ul class="eyebrow" aria-label="Tags">
+        <li>Raspberry Pi</li><li>FM · 76–108 MHz</li><li>RDS</li>
+        <li><span data-l="en">Bluetooth</span><span data-l="ar">بلوتوث</span></li>
+        <li><span data-l="en">No internet</span><span data-l="ar">بلا إنترنت</span></li>
+      </ul>
+      <h1>
+        <span data-l="en">Your car only has FM.<br><span class="glow">Give it your own station.</span></span>
+        <span data-l="ar">سيارتك فيها راديو FM فقط؟<br><span class="glow">اصنع لها محطتك الخاصة.</span></span>
+      </h1>
+      <p class="lead">
+        <span data-l="en">PiWave turns a ~$15 Raspberry Pi Zero 2 W and <b>one 20 cm wire</b> into a tiny, private FM station for your car: your songs, your voice, your phone over Bluetooth, all controlled from a web page on your phone. No internet needed.</span>
+        <span data-l="ar">يحوّل PiWave جهاز راسبيري باي Zero 2 W (بحوالي 15 دولارًا) و<b>سلكًا واحدًا بطول 20 سم</b> إلى محطة FM صغيرة وخاصة بسيارتك: أغانيك، وصوتك، وهاتفك عبر البلوتوث، وكل ذلك من صفحة على هاتفك. ومن دون إنترنت.</span>
+      </p>
+      <div class="cta">
+        <a class="btn primary" href="#install">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span data-l="en">Install guide</span><span data-l="ar">دليل التثبيت</span>
+        </a>
+        <a class="btn" href="https://github.com/Devehab/PiWave">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+          <span data-l="en">View on GitHub</span><span data-l="ar">المشروع على GitHub</span>
+        </a>
+      </div>
+      <div class="hero-meta">
+        <div><b><span dir="ltr">~$15</span></b><span data-l="en">the whole computer</span><span data-l="ar">ثمن الكمبيوتر كله</span></div>
+        <div><b><span dir="ltr">20 cm</span></b><span data-l="en">one wire on pin 7</span><span data-l="ar">سلك واحد على الرجل 7</span></div>
+        <div><b><span dir="ltr">0</span></b><span data-l="en">internet needed in the car</span><span data-l="ar">إنترنت مطلوب في السيارة</span></div>
+      </div>
+    </div>
+
+    <div class="radio-wrap reveal">
+      <div class="rings" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="radio" id="radio" dir="ltr" role="img" aria-label="Animated car radio tuning to 107.9 MHz, station PI RADIO">
+        <div class="radio-top">
+          <div class="knob small" aria-hidden="true"></div>
+          <div class="lcd">
+            <div class="noise"></div>
+            <div class="ind"><span>STEREO</span><span>RDS</span><span>TP</span><span class="fm">FM1</span></div>
+            <div class="readout"><span id="lcdF">88.0</span><small>MHz</small></div>
+            <div class="ps" id="lcdPS">PI RADIO</div>
+            <div class="rt"><span id="lcdRT">3mrw Dyab - Tmly M3ak</span></div>
+          </div>
+          <div class="knob" id="knob" aria-hidden="true"></div>
+        </div>
+        <div class="dial" aria-hidden="true">
+          <div class="ticks"></div>
+          <div class="nums"><span>88</span><span>92</span><span>96</span><span>100</span><span>104</span><span>108</span></div>
+          <div class="dial-inner"><div class="needle" id="dialN"></div></div>
+        </div>
+        <div class="presets" id="presets">
+          <button type="button" data-p="0" aria-pressed="true"><b>107.9</b><span data-l="en">Songs</span><span data-l="ar">أغاني</span></button>
+          <button type="button" data-p="1" aria-pressed="false"><b>88.1</b><span data-l="en">Live mic</span><span data-l="ar">مايك</span></button>
+          <button type="button" data-p="2" aria-pressed="false"><b>99.5</b><span data-l="en">Bluetooth</span><span data-l="ar">بلوتوث</span></button>
+          <button type="button" data-p="3" aria-pressed="false"><b>103.7</b><span data-l="en">Voice note</span><span data-l="ar">تسجيل</span></button>
+        </div>
+      </div>
+      <p class="radio-cap"><span data-l="en">Tap a preset. This is what your car's display shows (RDS).</span><span data-l="ar">جرّب الأزرار: هذا ما يظهر على شاشة راديو السيارة (RDS).</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================== 1 problem -->
+<section id="problem" data-f="88.1">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="ghost" aria-hidden="true">88.1</div>
+      <div class="station"><span class="dot"></span><span class="mhz">88.1</span><span data-l="en">The problem</span><span data-l="ar">المشكلة</span></div>
+      <h2><span data-l="en">A perfectly good car, stuck with an FM-only radio</span><span data-l="ar">سيارة ممتازة… وراديو لا يعرف إلا FM</span></h2>
+      <p class="sub"><span data-l="en">Plenty of cars, many older Toyotas among them, have a stereo that only does FM. Nothing to plug into, nothing to pair with.</span><span data-l="ar">كثير من السيارات، ومنها موديلات تويوتا القديمة، فيها مسجّل لا يشغّل إلا FM. لا شيء تشبك فيه، ولا شيء تقترن به.</span></p>
+    </div>
+    <div class="problem-grid">
+      <div class="dash reveal">
+        <div class="dash-radio" dir="ltr"><span>FM</span><span class="lcd-mini">101.1</span><span>AM</span></div>
+        <div class="ports" dir="ltr">
+          <div class="port"><b>AUX</b><span data-l="en">none</span><span data-l="ar">لا يوجد</span></div>
+          <div class="port"><b>USB</b><span data-l="en">none</span><span data-l="ar">لا يوجد</span></div>
+          <div class="port"><b>BT</b><span data-l="en">none</span><span data-l="ar">لا يوجد</span></div>
+        </div>
+      </div>
+      <div class="card reveal">
+        <p class="big-quote"><span data-l="en">Lighter-socket FM transmitters help a little, but they only relay your phone.</span><span data-l="ar">أجهزة البث التي تُركَّب في ولّاعة السيارة تحلّ جزءًا صغيرًا: هي مجرد ناقل لصوت هاتفك.</span></p>
+        <ul class="checklist">
+          <li><span data-l="en">No music library that lives in the car</span><span data-l="ar">لا مكتبة أغانٍ تبقى في السيارة</span></li>
+          <li><span data-l="en">No way to talk live to everyone in the car</span><span data-l="ar">لا طريقة لتتكلم مباشرة فيسمعك الجميع</span></li>
+          <li><span data-l="en">No web page to control the frequency, the station name, or anything else</span><span data-l="ar">لا صفحة تتحكم منها بالتردد واسم المحطة وغيرهما</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================== 2 solution -->
+<section id="solution" data-f="92.5">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="ghost" aria-hidden="true">92.5</div>
+      <div class="station"><span class="dot"></span><span class="mhz">92.5</span><span data-l="en">The solution</span><span data-l="ar">الحل</span></div>
+      <h2><span data-l="en">A $15 computer that <em>is</em> the radio station</span><span data-l="ar">كمبيوتر بـ15 دولارًا هو نفسه محطة الإذاعة</span></h2>
+    </div>
+    <div class="solution">
+      <div class="reveal">
+        <div class="equation" dir="ltr">
+          <span class="pill">Pi Zero 2 W</span><span class="op">+</span><span class="pill">20 cm wire</span><span class="op">=</span><span class="pill hl">107.9 FM</span>
+        </div>
+        <p class="sub" style="margin-bottom:18px">
+          <span data-l="en">The Raspberry Pi can generate an FM signal straight out of <b>GPIO4 (physical pin 7)</b>. PiWave builds a whole product around that: its own Wi-Fi, a polished web app, and a transmitter that never goes silent between songs.</span>
+          <span data-l="ar">يستطيع الراسبيري باي توليد إشارة FM مباشرة من <b>المنفذ GPIO4 (الرجل رقم 7)</b>. وPiWave يبني حول هذه القدرة منتجًا كاملًا: شبكة واي فاي خاصة، وتطبيق ويب أنيق، وبثًّا لا ينقطع بين أغنية وأخرى.</span>
+        </p>
+        <ul class="checklist ok">
+          <li><span data-l="en">Runs its own Wi-Fi: no internet, no router, no app to install</span><span data-l="ar">شبكة واي فاي خاصة به: بلا إنترنت، بلا راوتر، وبلا تطبيق تثبّته</span></li>
+          <li><span data-l="en">Starts broadcasting by itself when you start the car, and resumes your last song</span><span data-l="ar">يبدأ البث وحده مع تشغيل السيارة، ويكمل آخر أغنية</span></li>
+          <li><span data-l="en">Shows up as a Bluetooth speaker called <b>PiRadio</b></span><span data-l="ar">يظهر في هاتفك كسماعة بلوتوث اسمها <b>PiRadio</b></span></li>
+          <li><span data-l="en">Updates itself from a file you upload, and rolls back if anything breaks</span><span data-l="ar">يتحدّث من ملف ترفعه من الصفحة، ويعود للنسخة السابقة إذا تعطّل شيء</span></li>
+        </ul>
+      </div>
+      <div class="card reveal" style="padding:26px">
+        <svg viewBox="0 0 420 250" class="pi-art" role="img" aria-label="Raspberry Pi Zero with a wire on pin 7 sending radio waves">
+          <defs><radialGradient id="wg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#f5a524" stop-opacity=".35"/><stop offset="1" stop-color="#f5a524" stop-opacity="0"/></radialGradient></defs>
+          <circle cx="300" cy="86" r="90" fill="url(#wg)"/>
+          <g fill="none" stroke="#f5a524" stroke-linecap="round">
+            <path d="M318 56a40 40 0 0 1 0 60" stroke-width="3" opacity=".9"><animate attributeName="opacity" values=".9;.2;.9" dur="1.8s" repeatCount="indefinite"/></path>
+            <path d="M334 40a64 64 0 0 1 0 92" stroke-width="3" opacity=".6"><animate attributeName="opacity" values=".6;.1;.6" dur="1.8s" begin=".3s" repeatCount="indefinite"/></path>
+            <path d="M350 24a88 88 0 0 1 0 124" stroke-width="3" opacity=".35"><animate attributeName="opacity" values=".35;.05;.35" dur="1.8s" begin=".6s" repeatCount="indefinite"/></path>
+          </g>
+          <rect x="30" y="120" width="250" height="100" rx="12" fill="#1f5c3a" stroke="#2f7d52" stroke-width="2"/>
+          <rect x="54" y="128" width="200" height="22" rx="3" fill="#0d2f1e"/>
+          <g fill="#c9a86a">
+            <circle cx="64" cy="134" r="3.2"/><circle cx="74" cy="134" r="3.2"/><circle cx="84" cy="134" r="3.2"/><circle cx="94" cy="134" r="3.2"/><circle cx="104" cy="134" r="3.2"/><circle cx="114" cy="134" r="3.2"/><circle cx="124" cy="134" r="3.2"/><circle cx="134" cy="134" r="3.2"/><circle cx="144" cy="134" r="3.2"/><circle cx="154" cy="134" r="3.2"/><circle cx="164" cy="134" r="3.2"/><circle cx="174" cy="134" r="3.2"/><circle cx="184" cy="134" r="3.2"/><circle cx="194" cy="134" r="3.2"/><circle cx="204" cy="134" r="3.2"/><circle cx="214" cy="134" r="3.2"/><circle cx="224" cy="134" r="3.2"/><circle cx="234" cy="134" r="3.2"/><circle cx="244" cy="134" r="3.2"/>
+            <circle cx="64" cy="144" r="3.2"/><circle cx="74" cy="144" r="3.2"/><circle cx="84" cy="144" r="3.2"/><circle cx="104" cy="144" r="3.2"/><circle cx="114" cy="144" r="3.2"/><circle cx="124" cy="144" r="3.2"/><circle cx="134" cy="144" r="3.2"/><circle cx="144" cy="144" r="3.2"/><circle cx="154" cy="144" r="3.2"/><circle cx="164" cy="144" r="3.2"/><circle cx="174" cy="144" r="3.2"/><circle cx="184" cy="144" r="3.2"/><circle cx="194" cy="144" r="3.2"/><circle cx="204" cy="144" r="3.2"/><circle cx="214" cy="144" r="3.2"/><circle cx="224" cy="144" r="3.2"/><circle cx="234" cy="144" r="3.2"/><circle cx="244" cy="144" r="3.2"/>
+          </g>
+          <circle cx="94" cy="144" r="4.2" fill="#f5a524"/>
+          <circle cx="94" cy="144" r="9" fill="none" stroke="#f5a524" stroke-width="2"><animate attributeName="r" values="7;12;7" dur="1.6s" repeatCount="indefinite"/></circle>
+          <path d="M94 144 C 94 90, 200 70, 300 86" fill="none" stroke="#f5a524" stroke-width="4" stroke-linecap="round"/>
+          <rect x="120" y="170" width="44" height="34" rx="4" fill="#2b2f38"/>
+          <rect x="16" y="150" width="22" height="40" rx="3" fill="#8b919c"/>
+          <rect x="200" y="206" width="24" height="12" rx="3" fill="#8b919c"/><rect x="238" y="206" width="24" height="12" rx="3" fill="#34c77b"/>
+          <text x="94" y="236" font-family="Share Tech Mono, monospace" font-size="13" fill="#f5a524" text-anchor="middle">GPIO4 · PIN 7</text>
+          <text x="210" y="70" font-family="Share Tech Mono, monospace" font-size="13" fill="#ffcf70">20 cm</text>
+        </svg>
+        <p><span data-l="en">One female jumper wire on pin 7, the other end free in the air. That's the whole antenna, on purpose: short means only your car hears it.</span><span data-l="ar">سلك جمبر واحد على الرجل 7، وطرفه الآخر حرّ في الهواء. هذا هو الهوائي كله، وعن قصد: قِصَر السلك يعني أن سيارتك فقط هي التي تسمع البث.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================== 3 how it works -->
+<section id="how" data-f="97.3">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="ghost" aria-hidden="true">97.3</div>
+      <div class="station"><span class="dot"></span><span class="mhz">97.3</span><span data-l="en">How it works</span><span data-l="ar">كيف يعمل</span></div>
+      <h2><span data-l="en">From your phone to the car speakers</span><span data-l="ar">من هاتفك إلى سماعات السيارة</span></h2>
+    </div>
+    <div class="path reveal">
+      <div class="node">
+        <div class="k"><span data-l="en">01 · You</span><span data-l="ar">01 · أنت</span></div>
+        <h3><span data-l="en">Your phone</span><span data-l="ar">هاتفك</span></h3>
+        <p><span data-l="en">Web app in any browser, music over Bluetooth, your voice from the mic.</span><span data-l="ar">تطبيق ويب من أي متصفح، وموسيقى عبر البلوتوث، وصوتك من المايك.</span></p>
+      </div>
+      <div class="link" aria-hidden="true"><span class="line"></span><span class="lbl">Wi-Fi · BT</span></div>
+      <div class="node pi">
+        <div class="k"><span data-l="en">02 · The brain</span><span data-l="ar">02 · العقل</span></div>
+        <h3>Raspberry Pi Zero 2 W</h3>
+        <p><span data-l="en">ffmpeg decodes, boosts treble for FM and limits peaks; PiFmRds builds the stereo + RDS signal.</span><span data-l="ar">ffmpeg يفكّ الصوت ويقوّي الترددات العالية ويضبط القمم، وPiFmRds يبني إشارة الستيريو مع RDS.</span></p>
+      </div>
+      <div class="link" aria-hidden="true"><span class="line"></span><span class="lbl">GPIO4</span></div>
+      <div class="node">
+        <div class="k"><span data-l="en">03 · The antenna</span><span data-l="ar">03 · الهوائي</span></div>
+        <h3><span data-l="en">Pin 7 + 20 cm wire</span><span data-l="ar">الرجل 7 + سلك 20 سم</span></h3>
+        <div class="waves-mini" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <p><span data-l="en">The Pi's clock is steered to the frequency you pick, so the wire radiates a very weak FM signal.</span><span data-l="ar">تُوجَّه ساعة الراسبيري إلى التردد الذي تختاره، فيبث السلك إشارة FM ضعيفة جدًا.</span></p>
+      </div>
+      <div class="link" aria-hidden="true"><span class="line"></span><span class="lbl">FM</span></div>
+      <div class="node car">
+        <div class="k"><span data-l="en">04 · Your car</span><span data-l="ar">04 · سيارتك</span></div>
+        <h3><span data-l="en">Car radio on 107.9</span><span data-l="ar">راديو السيارة على 107.9</span></h3>
+        <p><span data-l="en">Tune to the same frequency. The display shows the station name and the song.</span><span data-l="ar">اضبط الراديو على نفس التردد، فتظهر على الشاشة المحطة واسم الأغنية.</span></p>
+      </div>
+    </div>
+    <p class="path-note reveal"><span data-l="en">When nothing is playing, PiWave keeps sending silence, so the carrier and the station name stay on your display and you never hear static between songs.</span><span data-l="ar">حين لا يكون هناك ما يُشغَّل، يواصل PiWave بث الصمت، فتبقى المحطة واسمها على الشاشة ولا تسمع أي تشويش بين الأغاني.</span></p>
+  </div>
+</section>
+
+<!-- ======================================================== 4 features -->
+<section id="features" data-f="101.1">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="ghost" aria-hidden="true">101.1</div>
+      <div class="station"><span class="dot"></span><span class="mhz">101.1</span><span data-l="en">Features</span><span data-l="ar">المزايا</span></div>
+      <h2><span data-l="en">Everything a car stereo forgot</span><span data-l="ar">كل ما نسيه مسجّل السيارة</span></h2>
+    </div>
+    <div class="grid g3">
+      <div class="feat reveal"><div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="14" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M14.5 12.5h3.5M14.5 15.5h3.5M6 8l11-4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <h3><span data-l="en">Any frequency</span><span data-l="ar">أي تردد تريده</span></h3>
+        <p><span data-l="en">76–108 MHz in 0.1 steps, changed live from the page.</span><span data-l="ar">من 76 إلى 108 ميغاهيرتز بخطوة 0.1، ويتغيّر فورًا من الصفحة.</span></p></div>
+      <div class="feat reveal"><div class="ico"><svg viewBox="0 0 24 24"><path d="M9 18V5.5l11-2V16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="17.5" cy="16" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></div>
+        <h3><span data-l="en">Your music library</span><span data-l="ar">مكتبة أغانيك</span></h3>
+        <p><span data-l="en">Upload MP3, M4A, FLAC, OGG… from the phone, or drop them on the SD card. Shuffle, repeat, seek.</span><span data-l="ar">ارفع MP3 وM4A وFLAC وOGG من الهاتف، أو انسخها إلى بطاقة الذاكرة. مع تشغيل عشوائي وتكرار وتقديم.</span></p></div>
+      <div class="feat reveal"><div class="ico red"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <h3><span data-l="en">Push-to-talk, live</span><span data-l="ar">تكلّم مباشرة</span></h3>
+        <p><span data-l="en">Hold the big button and speak: your voice is on the car speakers in under a second. The song pauses and comes back by itself.</span><span data-l="ar">اضغط مطوّلًا على الزر وتكلّم: يخرج صوتك من سماعات السيارة خلال أقل من ثانية، وتتوقف الأغنية ثم تعود وحدها.</span></p></div>
+      <div class="feat reveal"><div class="ico blue"><svg viewBox="0 0 24 24"><path d="M7 7.5l10 9-5 4.5V3l5 4.5-10 9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3><span data-l="en">Bluetooth speaker</span><span data-l="ar">سماعة بلوتوث</span></h3>
+        <p><span data-l="en">Pair with "PiRadio" and anything your phone plays goes out on FM. Pairing mode, unpairing and phone controls, all from the page.</span><span data-l="ar">اقرن هاتفك بـ«PiRadio» وأي صوت يشغّله يُبث على الراديو. وضع الاقتران وفكّه والتحكم بالهاتف، كله من الصفحة.</span></p></div>
+      <div class="feat reveal"><div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <h3><span data-l="en">RDS on your display</span><span data-l="ar">RDS على شاشة السيارة</span></h3>
+        <p><span data-l="en">Station name and song title on the car screen. Arabic titles show as Arabizi.</span><span data-l="ar">اسم المحطة واسم الأغنية على شاشة السيارة، والعناوين العربية تظهر بالعربيزي.</span></p>
+        <span class="rds">3mrw Dyab - Tmly M3ak</span></div>
+      <div class="feat reveal"><div class="ico violet"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+        <h3><span data-l="en">Voice clips</span><span data-l="ar">مقاطع صوتية</span></h3>
+        <p><span data-l="en">Record a message on your phone and broadcast it now, once or on a loop.</span><span data-l="ar">سجّل رسالة من هاتفك وابثّها فورًا، مرة واحدة أو بشكل متكرر.</span></p></div>
+      <div class="feat reveal"><div class="ico green"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3><span data-l="en">Signal check</span><span data-l="ar">فحص الإشارة</span></h3>
+        <p><span data-l="en">Proves pin 7 is really transmitting, with a live audio meter, power and temperature checks, and a test chime.</span><span data-l="ar">يثبت أن الرجل 7 تبث فعلًا، مع مؤشر صوت حي وفحص للكهرباء والحرارة ونغمة اختبار.</span></p></div>
+      <div class="feat reveal"><div class="ico blue"><svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="19.5" r="1.4" fill="currentColor"/></svg></div>
+        <h3><span data-l="en">Its own Wi-Fi</span><span data-l="ar">شبكة واي فاي خاصة</span></h3>
+        <p><span data-l="en">Join "PiRadio" and the page opens. The welcome page shows once per phone, with a copy-link button.</span><span data-l="ar">اتصل بشبكة «PiRadio» فتفتح الصفحة. صفحة الترحيب تظهر مرة واحدة لكل هاتف، ومعها زر لنسخ الرابط.</span></p></div>
+      <div class="feat reveal"><div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3v8M7 6.3a7.5 7.5 0 1 0 10 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></div>
+        <h3><span data-l="en">Picks up where you left</span><span data-l="ar">يكمل من حيث توقفت</span></h3>
+        <p><span data-l="en">Start the car and it's back on air in seconds, same frequency, same song, same second.</span><span data-l="ar">شغّل السيارة فيعود البث خلال ثوانٍ، بنفس التردد ونفس الأغنية ومن نفس الثانية.</span></p></div>
+      <div class="feat reveal"><div class="ico green"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3><span data-l="en">Safe updates</span><span data-l="ar">تحديثات آمنة</span></h3>
+        <p><span data-l="en">Upload an update file from the page. It's verified, health-checked, and rolled back automatically if it fails.</span><span data-l="ar">ارفع ملف التحديث من الصفحة: يُفحص ويُراقَب، وإن فشل يعود للنسخة السابقة تلقائيًا.</span></p></div>
+      <div class="feat reveal"><div class="ico violet"><svg viewBox="0 0 24 24"><path d="M4 5h9M8.5 3v2M6 5c0 4 3 7 6 8M11 5c0 3-3 7-7 9M13 21l4.5-10L22 21M14.6 17.5h5.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3><span data-l="en">English & Arabic</span><span data-l="ar">إنجليزي وعربي</span></h3>
+        <p><span data-l="en">The whole app in both languages, switch any time in Settings.</span><span data-l="ar">التطبيق كاملًا باللغتين، وتغيّر اللغة متى شئت من الإعدادات.</span></p></div>
+      <div class="feat reveal"><div class="ico red"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3><span data-l="en">Built to survive the car</span><span data-l="ar">مصمَّم ليتحمّل السيارة</span></h3>
+        <p><span data-l="en">Power cuts, a transmitter crash, a bad update: it recovers by itself. Logs stay in RAM to spare the SD card.</span><span data-l="ar">انقطاع الكهرباء أو تعطّل برنامج البث أو تحديث سيئ: يتعافى وحده. والسجلات في الذاكرة لحماية بطاقة الذاكرة.</span></p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================== 5 boards -->
+<section id="boards" data-f="103.7">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="ghost" aria-hidden="true">103.7</div>
+      <div class="station"><span class="dot"></span><span class="mhz">103.7</span><span data-l="en">Supported boards</span><span data-l="ar">الأجهزة المدعومة</span></div>
+      <h2><span data-l="en">Which Raspberry Pi?</span><span data-l="ar">أي راسبيري باي؟</span></h2>
+      <p class="sub"><span data-l="en">Honest status: only the Zero 2 W has been tested on real hardware so far.</span><span data-l="ar">بكل صراحة: حتى الآن جُرِّب Zero 2 W فقط على جهاز حقيقي.</span></p>
+    </div>
+    <div class="boards">
+      <div class="board t1 reveal">
+        <span class="badge"><span data-l="en">Tested</span><span data-l="ar">مُجرَّب</span></span>
+        <ul class="chips"><li>Raspberry Pi Zero 2 W</li></ul>
+        <p><span data-l="en">The reference board: tiny, cheap, on-board Wi-Fi and Bluetooth, four cores. Everything on this page runs on it.</span><span data-l="ar">الجهاز المرجعي: صغير ورخيص، فيه واي فاي وبلوتوث وأربع أنوية. كل ما في هذه الصفحة يعمل عليه.</span></p>
+      </div>
+      <div class="board t2 reveal">
+        <span class="badge"><span data-l="en">Should work · not tested yet</span><span data-l="ar">يُفترض أن يعمل · لم يُجرَّب بعد</span></span>
+        <ul class="chips"><li>Pi 3 B</li><li>Pi 3 B+</li><li>Pi 3 A+</li><li>Pi 4 B</li><li>Pi 400</li><li>Zero W</li></ul>
+        <p><span data-l="en">On-board Wi-Fi and Bluetooth, same transmitter code. The Zero W works but is slower (a single core).</span><span data-l="ar">فيها واي فاي وبلوتوث، ونفس كود البث. الـZero W يعمل لكنه أبطأ (نواة واحدة).</span></p>
+      </div>
+      <div class="board t3 reveal">
+        <span class="badge"><span data-l="en">With a USB Wi-Fi adapter</span><span data-l="ar">مع محوّل واي فاي USB</span></span>
+        <ul class="chips"><li>Pi 1</li><li>Pi 2</li><li>Zero</li></ul>
+        <p><span data-l="en">They can transmit, but have no Wi-Fi of their own: add a USB adapter that supports AP (hotspot) mode. No Bluetooth.</span><span data-l="ar">تستطيع البث، لكن ليس فيها واي فاي: أضف محوّل USB يدعم وضع نقطة الاتصال (AP). ولا بلوتوث فيها.</span></p>
+      </div>
+      <div class="board t4 reveal">
+        <span class="badge"><span data-l="en">Not supported</span><span data-l="ar">غير مدعوم</span></span>
+        <ul class="chips"><li>Pi 5</li><li>Pi 500</li><li>Compute Module 5</li></ul>
+        <p><span data-l="en">The Pi 5 moved its GPIO to the RP1 chip, which can't generate FM on GPIO4. The installer stops on these boards.</span><span data-l="ar">نقل الـPi 5 منافذ GPIO إلى شريحة RP1 التي لا تستطيع توليد FM على GPIO4. المثبّت يتوقف على هذه الأجهزة.</span></p>
+      </div>
+    </div>
+    <div class="os-note reveal">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 11v6M12 7.5v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <div><span data-l="en">Needs <b>Raspberry Pi OS Bookworm or newer</b> (it uses NetworkManager for the hotspot). <b>Lite 64-bit</b> is recommended; use the <b>32-bit</b> image on a Pi 1, Zero or Zero W.</span><span data-l="ar">يحتاج <b>Raspberry Pi OS إصدار Bookworm أو أحدث</b> (يستعمل NetworkManager لنقطة الاتصال). يُنصح بنسخة <b>Lite 64-bit</b>، واستعمل نسخة <b>32-bit</b> مع Pi 1 وZero وZero W.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================== 6 what you need -->
+<section id="need" data-f="104.5">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="ghost" aria-hidden="true">104.5</div>
+      <div class="station"><span class="dot"></span><span class="mhz">104.5</span><span data-l="en">What you need</span><span data-l="ar">ماذا تحتاج</span></div>
+      <h2><span data-l="en">A small shopping list</span><span data-l="ar">قائمة مشتريات قصيرة</span></h2>
+    </div>
+    <div class="grid g3 need">
+      <div class="card reveal"><div class="ico green"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 10h12" stroke="currentColor" stroke-width="1.8" stroke-dasharray="1.5 2"/></svg></div>
+        <div><h3>Raspberry Pi Zero 2 W</h3><p><span data-l="en">With the header pins soldered on (or solder the wire straight into hole 7).</span><span data-l="ar">مع الأرجل (Header) ملحومة عليه، أو الحم السلك مباشرة في الفتحة رقم 7.</span></p></div></div>
+      <div class="card reveal"><div class="ico blue"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 7v3M12.5 7v3M15 9v1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <div><h3><span data-l="en">microSD, 8 GB or more</span><span data-l="ar">بطاقة microSD بسعة 8GB أو أكثر</span></h3><p><span data-l="en">Flashed with Raspberry Pi OS Lite using Raspberry Pi Imager.</span><span data-l="ar">عليها Raspberry Pi OS Lite عبر برنامج Raspberry Pi Imager.</span></p></div></div>
+      <div class="card reveal"><div class="ico"><svg viewBox="0 0 24 24"><path d="M5 19c5 0 4-14 9-14s4 9 6 9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><rect x="3" y="17" width="4" height="4" rx="1" fill="currentColor"/></svg></div>
+        <div><h3><span data-l="en">One ~20 cm jumper wire</span><span data-l="ar">سلك جمبر واحد بطول 20 سم تقريبًا</span></h3><p><span data-l="en">Female end on pin 7. That's your antenna.</span><span data-l="ar">طرفه الأنثى على الرجل 7، وهذا هو الهوائي.</span></p></div></div>
+      <div class="card reveal"><div class="ico red"><svg viewBox="0 0 24 24"><path d="M13 2L5 13h6l-1 9 8-11h-6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+        <div><h3><span data-l="en">Car USB charger, 5V / 2.5A</span><span data-l="ar">شاحن سيارة USB بقوة 5V / 2.5A</span></h3><p><span data-l="en">And a decent micro-USB cable. Weak chargers cause dropouts.</span><span data-l="ar">مع كيبل micro-USB جيد. الشاحن الضعيف يسبب انقطاعات.</span></p></div></div>
+      <div class="card reveal"><div class="ico violet"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 20v-5h6v5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></div>
+        <div><h3><span data-l="en">Home Wi-Fi, once</span><span data-l="ar">واي فاي البيت، مرة واحدة</span></h3><p><span data-l="en">Only for the install (it downloads ffmpeg and Bluetooth). Never again after that.</span><span data-l="ar">للتثبيت فقط (ينزّل ffmpeg والبلوتوث)، ولا تحتاجه بعدها أبدًا.</span></p></div></div>
+      <div class="card reveal"><div class="ico green"><svg viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <div><h3><span data-l="en">Any phone with a browser</span><span data-l="ar">أي هاتف فيه متصفح</span></h3><p><span data-l="en">iPhone or Android. Nothing to install from a store.</span><span data-l="ar">آيفون أو أندرويد، ولا شيء تثبّته من المتجر.</span></p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================== 7 install -->
+<section id="install" data-f="105.9">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="ghost" aria-hidden="true">105.9</div>
+      <div class="station"><span class="dot"></span><span class="mhz">105.9</span><span data-l="en">Install</span><span data-l="ar">التثبيت</span></div>
+      <h2><span data-l="en">On air in five steps</span><span data-l="ar">على الهواء في خمس خطوات</span></h2>
+      <p class="sub"><span data-l="en">About 30 minutes, most of it waiting.</span><span data-l="ar">حوالي نصف ساعة، معظمها انتظار.</span></p>
+    </div>
+    <ol class="steps">
+      <li class="step reveal">
+        <h3><span data-l="en">Prepare the SD card</span><span data-l="ar">جهّز بطاقة الذاكرة</span></h3>
+        <div class="step-body">
+          <p><span data-l="en">In <b>Raspberry Pi Imager</b> choose your board and <b>Raspberry Pi OS Lite (64-bit)</b>. Before writing, open the settings (<b>Edit settings</b>) and set:</span><span data-l="ar">في <b>Raspberry Pi Imager</b> اختر جهازك ثم <b>Raspberry Pi OS Lite (64-bit)</b>. وقبل الكتابة افتح الإعدادات (<b>Edit settings</b>) واضبط:</span></p>
+          <ul>
+            <li><span data-l="en">Hostname: <span class="k-inline">piradio</span></span><span data-l="ar">اسم الجهاز: <span class="k-inline">piradio</span></span></li>
+            <li><span data-l="en">A username and password (for example <span class="k-inline">pi</span>)</span><span data-l="ar">اسم مستخدم وكلمة سر (مثلًا <span class="k-inline">pi</span>)</span></li>
+            <li><span data-l="en">Your home Wi-Fi and your country</span><span data-l="ar">واي فاي البيت وبلدك</span></li>
+            <li><span data-l="en">Services: <b>Enable SSH</b></span><span data-l="ar">الخدمات: <b>Enable SSH</b></span></li>
+          </ul>
+        </div>
+      </li>
+      <li class="step reveal">
+        <h3><span data-l="en">Get PiWave onto the Pi</span><span data-l="ar">انقل PiWave إلى الراسبيري</span></h3>
+        <div class="step-body">
+          <p><span data-l="en"><b>Option A:</b> download the project and copy the <span class="k-inline">piradio</span> folder, unchanged, onto the SD card's <span class="k-inline">bootfs</span> drive (you should end up with <span class="k-inline">bootfs/piradio/install.sh</span>).</span><span data-l="ar"><b>الطريقة الأولى:</b> نزّل المشروع وانسخ مجلد <span class="k-inline">piradio</span> كما هو إلى قرص <span class="k-inline">bootfs</span> في بطاقة الذاكرة (يجب أن يصبح المسار <span class="k-inline">bootfs/piradio/install.sh</span>).</span></p>
+          <div class="or"><span data-l="en">or</span><span data-l="ar">أو</span></div>
+          <p><span data-l="en"><b>Option B:</b> boot the Pi, connect with SSH (step 3) and clone it there:</span><span data-l="ar"><b>الطريقة الثانية:</b> شغّل الراسبيري، واتصل به عبر SSH (الخطوة 3)، ثم انسخ المشروع عليه مباشرة:</span></p>
+          <div class="code"><code>sudo apt install -y git</code><button class="copy" type="button"></button></div>
+          <div class="code"><code>git clone https://github.com/Devehab/PiWave</code><button class="copy" type="button"></button></div>
+        </div>
+      </li>
+      <li class="step reveal">
+        <h3><span data-l="en">Run the installer</span><span data-l="ar">شغّل المثبّت</span></h3>
+        <div class="step-body">
+          <p><span data-l="en">Power the Pi, wait 2–5 minutes for the first boot, then from a terminal on your computer:</span><span data-l="ar">وصّل الكهرباء، وانتظر من 2 إلى 5 دقائق لأن أول تشغيل بطيء، ثم من الطرفية (Terminal) على كمبيوترك:</span></p>
+          <div class="code"><code>ssh pi@piradio.local</code><button class="copy" type="button"></button></div>
+          <p><span data-l="en">If you used option A:</span><span data-l="ar">إذا استعملت الطريقة الأولى:</span></p>
+          <div class="code"><code>sudo bash /boot/firmware/piradio/install.sh</code><button class="copy" type="button"></button></div>
+          <p><span data-l="en">If you used option B:</span><span data-l="ar">إذا استعملت الطريقة الثانية:</span></p>
+          <div class="code"><code>sudo bash PiWave/piradio/install.sh</code><button class="copy" type="button"></button></div>
+          <p><span data-l="en">It takes <b>10–20 minutes</b>: it installs ffmpeg and Bluetooth, builds the FM transmitter for your exact board, creates the <b>PiRadio</b> hotspot, then reboots. It's safe to run again. Don't unplug it meanwhile.</span><span data-l="ar">يستغرق <b>10 إلى 20 دقيقة</b>: يثبّت ffmpeg والبلوتوث، ويبني برنامج البث لجهازك تحديدًا، وينشئ شبكة <b>PiRadio</b>، ثم يعيد التشغيل. يمكنك تشغيله مرة أخرى بأمان، ولا تفصل الكهرباء خلال ذلك.</span></p>
+        </div>
+      </li>
+      <li class="step reveal">
+        <h3><span data-l="en">Connect the wire: pin 7 only</span><span data-l="ar">ركّب السلك: الرجل 7 فقط</span></h3>
+        <div class="step-body">
+          <div class="warn-inline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l10 18H2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v5M12 18v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span><span data-l="en"><b>Unplug the power first.</b> Never touch pins 2 or 4 (5V) or 6 / 9 (ground): a wrong pin can destroy the board.</span><span data-l="ar"><b>افصل الكهرباء أولًا.</b> لا تلمس الرجلين 2 و4 (5V) ولا 6 و9 (الأرضي): الرجل الخطأ قد تتلف اللوحة.</span></span></div>
+          <div class="pin-card"><svg id="pinout" viewBox="0 0 380 196" dir="ltr" style="direction:ltr" role="img" aria-label="Raspberry Pi header: the wire goes on pin 7, the fourth pin of the inner row from the SD card side"></svg></div>
+          <ul>
+            <li><span data-l="en">Hold the board with the pins on top and the SD card on the left.</span><span data-l="ar">أمسك اللوحة بحيث تكون الأرجل في الأعلى وبطاقة الذاكرة على اليسار.</span></li>
+            <li><span data-l="en">Count along the <b>inner row</b> from the SD-card end: 1, 3, 5, <b>7</b>. It's the fourth pin.</span><span data-l="ar">عُدّ في <b>الصف الداخلي</b> من جهة بطاقة الذاكرة: 1، 3، 5، <b>7</b>. إنها الرجل الرابعة.</span></li>
+            <li><span data-l="en">Keep the wire straight and the other end free. Power goes into <b>PWR IN</b>, the corner port.</span><span data-l="ar">اجعل السلك مستقيمًا وطرفه الآخر حرًّا. والكهرباء في منفذ <b>PWR IN</b> عند الزاوية.</span></li>
+          </ul>
+        </div>
+      </li>
+      <li class="step reveal">
+        <h3><span data-l="en">In the car</span><span data-l="ar">في السيارة</span></h3>
+        <div class="step-body">
+          <p><span data-l="en">Plug the Pi into the car charger, wait about 40 seconds, and on your phone join:</span><span data-l="ar">وصّل الراسبيري بشاحن السيارة، وانتظر حوالي 40 ثانية، ثم اتصل من هاتفك بالشبكة:</span></p>
+          <div class="creds">
+            <div class="cred"><span data-l="en">Wi-Fi</span><span data-l="ar">الشبكة</span><b>PiRadio</b></div>
+            <div class="cred"><span data-l="en">Password</span><span data-l="ar">كلمة السر</span><b>piradio123</b></div>
+            <div class="cred"><span data-l="en">Control page</span><span data-l="ar">صفحة التحكم</span><b>192.168.4.1</b></div>
+          </div>
+          <div class="code"><code class="url">http://192.168.4.1</code><button class="copy" type="button"></button></div>
+          <p><span data-l="en">The welcome page pops up once; tap <b>Done</b>. Then on the car radio press <b>FM</b> and tune manually to the frequency on the page (default <b>107.9</b>). Choose an <b>empty</b> frequency, one where you hear only static. Save it on a preset button.</span><span data-l="ar">تظهر صفحة الترحيب مرة واحدة، فاضغط <b>تم</b>. ثم اضغط <b>FM</b> في راديو السيارة واضبطه يدويًا على التردد الظاهر في الصفحة (الافتراضي <b>107.9</b>). اختر ترددًا <b>فارغًا</b> لا تسمع عليه إلا الوشوشة، واحفظه على أحد أزرار المحطات.</span></p>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ======================================================== 8 updates -->
+<section id="updates" data-f="106.5">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="ghost" aria-hidden="true">106.5</div>
+      <div class="station"><span class="dot"></span><span class="mhz">106.5</span><span data-l="en">Updates</span><span data-l="ar">التحديثات</span></div>
+      <h2><span data-l="en">Update from the page. Never reflash.</span><span data-l="ar">حدّث من الصفحة، دون إعادة تنزيل النظام</span></h2>
+    </div>
+    <div class="update-flow">
+      <div class="uf reveal"><div class="n">01</div><p><span data-l="en">Get <span class="k-inline">piradio-update-X.Y.Z.tar.gz</span> onto your phone or laptop.</span><span data-l="ar">احصل على الملف <span class="k-inline">piradio-update-X.Y.Z.tar.gz</span> على هاتفك أو حاسوبك.</span></p></div>
+      <div class="uf reveal"><div class="n">02</div><p><span data-l="en">Settings → Update → upload. Every file is checked against its checksum first.</span><span data-l="ar">الإعدادات ← التحديث ← ارفع الملف. يُفحص كل ملف مقابل بصمته (checksum) أولًا.</span></p></div>
+      <div class="uf reveal"><div class="n">03</div><p><span data-l="en">The new version installs next to the old one and the radio restarts in seconds. The version number is on the page.</span><span data-l="ar">تُثبَّت النسخة الجديدة بجانب القديمة ويعود الراديو خلال ثوانٍ، ورقم الإصدار ظاهر في الصفحة.</span></p></div>
+      <div class="uf roll reveal"><div class="n">04</div><p><span data-l="en">If it can't go on air within 90 s, or crashes 3 times, it <b>rolls back by itself</b>. There's also a manual rollback button.</span><span data-l="ar">إذا لم تستطع البث خلال 90 ثانية، أو تعطّلت 3 مرات، <b>تعود للنسخة السابقة وحدها</b>. وهناك أيضًا زر للرجوع يدويًا.</span></p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================== 9 faq -->
+<section id="faq" data-f="107.1">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="ghost" aria-hidden="true">107.1</div>
+      <div class="station"><span class="dot"></span><span class="mhz">107.1</span><span data-l="en">Questions</span><span data-l="ar">أسئلة</span></div>
+      <h2><span data-l="en">Good to know</span><span data-l="ar">من المفيد أن تعرف</span></h2>
+    </div>
+    <div class="faq">
+      <details class="q reveal">
+        <summary><span data-l="en">Which frequency should I use?</span><span data-l="ar">أي تردد أستعمل؟</span></summary>
+        <div class="a">
+          <p><span data-l="en">The best one is the one that's <b>empty where you are</b>. Before plugging the Pi in, tune the car radio by hand to 87.9, 88.1, 107.7 and 107.9: the first one with clean static and no trace of a station is yours.</span><span data-l="ar">أفضل تردد هو <b>الفارغ في منطقتك</b>. قبل توصيل الراسبيري، اضبط راديو السيارة يدويًا على 87.9 ثم 88.1 ثم 107.7 ثم 107.9: أول تردد تسمع عليه وشوشة صافية بلا أي أثر لمحطة هو ترددك.</span></p>
+          <p><span data-l="en">Frequencies ending in an odd digit (.1, .3, .5, .7, .9) work on every car, including American ones.</span><span data-l="ar">الترددات التي تنتهي برقم فردي (.1 و.3 و.5 و.7 و.9) تعمل على كل السيارات، حتى الأمريكية.</span></p>
+        </div>
+      </details>
+      <details class="q reveal">
+        <summary><span data-l="en">How far does it reach?</span><span data-l="ar">ما مدى البث؟</span></summary>
+        <div class="a">
+          <p><span data-l="en">Between 88 and 108 MHz the frequency barely changes the range; the wire length does. Rough figures:</span><span data-l="ar">بين 88 و108 ميغاهيرتز لا يغيّر التردد المدى تقريبًا، بل طول السلك. أرقام تقريبية:</span></p>
+          <table class="range">
+            <thead><tr><th><span data-l="en">Wire</span><span data-l="ar">السلك</span></th><th><span data-l="en">Range</span><span data-l="ar">المدى</span></th><th style="width:34%"></th></tr></thead>
+            <tbody>
+              <tr><td><span data-l="en">none</span><span data-l="ar">بلا سلك</span></td><td><span data-l="en">under 1 m</span><span data-l="ar">أقل من متر</span></td><td><span class="bar" style="width:6%"></span></td></tr>
+              <tr><td>10 cm</td><td><span data-l="en">about 2–5 m</span><span data-l="ar">2–5 أمتار تقريبًا</span></td><td><span class="bar" style="width:28%"></span></td></tr>
+              <tr class="best"><td>20 cm</td><td><span data-l="en">about 5–15 m · best for a car</span><span data-l="ar">5–15 مترًا تقريبًا · الأفضل للسيارة</span></td><td><span class="bar" style="width:55%"></span></td></tr>
+              <tr class="no"><td>~70 cm</td><td><span data-l="en">quarter-wave: 50–100 m+ · <b>don't</b></span><span data-l="ar">ربع الموجة: 50–100 متر وأكثر · <b>لا تفعل</b></span></td><td><span class="bar" style="width:100%"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <details class="q reveal">
+        <summary><span data-l="en">Why does my browser warn about a certificate when I use the mic?</span><span data-l="ar">لماذا يحذّرني المتصفح من الشهادة عند استعمال المايك؟</span></summary>
+        <div class="a"><p><span data-l="en">Browsers only allow the microphone on <span class="k-inline">https://</span> pages. The Pi makes its own certificate, which no public authority signed, because it's your device and not a website. Accept it once: <b>Show Details → visit this website</b> on iPhone, <b>Advanced → Proceed</b> on Android and Chrome.</span><span data-l="ar">المتصفحات لا تسمح بالمايك إلا في صفحات <span class="k-inline">https://</span>. والراسبيري يصنع شهادته بنفسه، ولم توقّعها جهة عامة، لأنه جهازك وليس موقعًا على الإنترنت. اقبلها مرة واحدة: <b>Show Details ← visit this website</b> في الآيفون، و<b>Advanced ← Proceed</b> في أندرويد وكروم.</span></p></div>
+      </details>
+      <details class="q reveal">
+        <summary><span data-l="en">Do I need internet in the car?</span><span data-l="ar">هل أحتاج إنترنت في السيارة؟</span></summary>
+        <div class="a"><p><span data-l="en">No. Internet is needed once, at home, for the install. In the car the Pi is its own network. Tip: while your phone is on PiRadio's Wi-Fi, apps that need internet may stop working; Bluetooth keeps working without Wi-Fi.</span><span data-l="ar">لا. تحتاج الإنترنت مرة واحدة في البيت للتثبيت فقط. في السيارة يكون الراسبيري شبكة بحد ذاته. ملاحظة: ما دام هاتفك متصلًا بواي فاي PiRadio قد تتوقف التطبيقات التي تحتاج الإنترنت، أما البلوتوث فيعمل من دون واي فاي.</span></p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================== 10 law -->
+<section id="law" data-f="107.9">
+  <div class="wrap">
+    <div class="law reveal">
+      <div class="law-head">
+        <div class="ico red"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 21h14M6 7h12M6 7l-3 7a3.5 3.5 0 0 0 6 0zM18 7l-3 7a3.5 3.5 0 0 0 6 0z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+        <div>
+          <div class="station"><span class="dot" style="background:var(--bad);box-shadow:0 0 10px var(--bad)"></span><span class="mhz">107.9</span><span data-l="en">Read before you build</span><span data-l="ar">اقرأ قبل أن تبدأ</span></div>
+          <h2><span data-l="en">Responsibility &amp; the law</span><span data-l="ar">المسؤولية والقانون</span></h2>
+          <p class="sub"><span data-l="en">PiWave is an <b>educational project</b>. Radio spectrum is shared by everyone, and using it is your responsibility.</span><span data-l="ar">PiWave <b>مشروع تعليمي</b>. الطيف الراديوي ملك للجميع، واستعماله مسؤوليتك أنت.</span></p>
+        </div>
+      </div>
+      <ul class="law-list">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span><span data-l="en"><b>FM transmission is regulated almost everywhere.</b> You are responsible for following your local law and for getting any approval or licence it requires. PiWave is not a certified (type-approved) device.</span><span data-l="ar"><b>البث على FM منظَّم بالقانون في كل مكان تقريبًا.</b> أنت المسؤول عن الالتزام بقانون بلدك والحصول على أي موافقة أو ترخيص يتطلبه. وPiWave ليس جهازًا معتمدًا (غير حاصل على اعتماد نوع).</span></span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c5 0 4-14 9-14s4 9 6 9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg><span><span data-l="en"><b>Keep the wire short</b> (20 cm or less) and the power tiny, so only your own car hears it. <b>Never</b> add an amplifier or a long antenna.</span><span data-l="ar"><b>اجعل السلك قصيرًا</b> (20 سم أو أقل) والقدرة ضئيلة، بحيث لا يسمعك إلا راديو سيارتك. <b>لا تضف أبدًا</b> مضخِّمًا أو هوائيًا طويلًا.</span></span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h3V6h4v12h4V6h4v6h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span><span data-l="en"><b>The Pi transmits a square wave</b>, which carries harmonics on other frequencies. They can interfere with other services, including the <b>aviation band just above 108 MHz</b>.</span><span data-l="ar"><b>الراسبيري يبث موجة مربّعة</b> تحمل توافقيات (هارمونيكس) على ترددات أخرى، وقد تشوّش على خدمات غيرها، ومنها <b>نطاق الطيران فوق 108 ميغاهيرتز مباشرة</b>.</span></span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span><span data-l="en"><b>Always pick an empty frequency</b>, and stop transmitting immediately if you cause interference to anyone.</span><span data-l="ar"><b>اختر دائمًا ترددًا فارغًا</b>، وأوقف البث فورًا إذا سبّبت تشويشًا لأي أحد.</span></span></li>
+      </ul>
+      <div class="regs">
+        <div class="reg">
+          <div class="where"><span data-l="en">USA</span><span data-l="ar">الولايات المتحدة</span></div>
+          <h3>FCC · Part 15</h3>
+          <p><span data-l="en">§15.239 allows unlicensed devices in 88–108 MHz only at a field strength of <span class="num">250 µV/m at 3 m</span>, inside a <span class="num">200 kHz</span> band. That's barely across a parking space.</span><span data-l="ar">المادة 15.239 تسمح بأجهزة غير مرخّصة في نطاق 88–108 ميغاهيرتز بشدة مجال لا تتجاوز <span class="num">250 µV/m</span> على بعد <span class="num">3 m</span>، ضمن عرض <span class="num">200 kHz</span>. أي بالكاد عرض موقف سيارة.</span></p>
+        </div>
+        <div class="reg">
+          <div class="where"><span data-l="en">European Union · CEPT</span><span data-l="ar">الاتحاد الأوروبي · CEPT</span></div>
+          <h3>ERC/REC 70-03 · EN 301 357</h3>
+          <p><span data-l="en">Short-range device rules allow low-power FM transmitters in 87.5–108 MHz at up to <span class="num">50 nW e.r.p.</span> Each country applies them through its own regulator.</span><span data-l="ar">قواعد الأجهزة قصيرة المدى تسمح بمرسلات FM منخفضة القدرة في نطاق 87.5–108 ميغاهيرتز حتى <span class="num">50 nW e.r.p.</span>، وتطبّقها كل دولة عبر هيئتها المنظِّمة.</span></p>
+        </div>
+        <div class="reg">
+          <div class="where"><span data-l="en">United Kingdom</span><span data-l="ar">المملكة المتحدة</span></div>
+          <h3>Ofcom</h3>
+          <p><span data-l="en">Only very-low-power in-car FM transmitters are licence-exempt. Check Ofcom's current interface requirements.</span><span data-l="ar">لا يُعفى من الترخيص إلا مرسلات FM ذات القدرة المنخفضة جدًا داخل السيارة. راجع متطلبات Ofcom الحالية.</span></p>
+        </div>
+        <div class="reg">
+          <div class="where"><span data-l="en">Jordan</span><span data-l="ar">الأردن</span></div>
+          <h3><span data-l="en">TRC</span><span data-l="ar">هيئة تنظيم قطاع الاتصالات (TRC)</span></h3>
+          <p><span data-l="en">Radio equipment needs the Telecommunications Regulatory Commission's approval. Check with the TRC before transmitting.</span><span data-l="ar">الأجهزة الراديوية تحتاج موافقة هيئة تنظيم قطاع الاتصالات. راجع الهيئة قبل أن تبث.</span></p>
+        </div>
+        <div class="reg">
+          <div class="where"><span data-l="en">Everywhere else</span><span data-l="ar">في أي بلد آخر</span></div>
+          <h3><span data-l="en">Your national regulator</span><span data-l="ar">الهيئة المنظِّمة في بلدك</span></h3>
+          <p><span data-l="en">Find your country's telecom or spectrum authority and read its rules for short-range FM devices before you build.</span><span data-l="ar">ابحث عن هيئة الاتصالات أو الطيف الترددي في بلدك واقرأ قواعدها للأجهزة قصيرة المدى قبل أن تبدأ.</span></p>
+        </div>
+      </div>
+      <p class="fine"><span data-l="en">These summaries are for orientation only, not legal advice, and rules change: always read the current official text. PiWave is provided "as is", without warranty of any kind; the authors accept no liability for how it's used. The FM transmitter is based on <a href="https://github.com/ChristopheJacquet/PiFmRds">PiFmRds</a> by Christophe Jacquet (GPL-3.0).</span><span data-l="ar">هذه الملخصات للتوجيه فقط وليست استشارة قانونية، والقوانين تتغيّر: اقرأ دائمًا النص الرسمي الحالي. يُقدَّم PiWave «كما هو» من دون أي ضمان، ولا يتحمّل أصحابه أي مسؤولية عن طريقة استخدامه. برنامج البث مبني على <a href="https://github.com/ChristopheJacquet/PiFmRds">PiFmRds</a> من تطوير Christophe Jacquet (برخصة GPL-3.0).</span></p>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div class="made">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15l2-6a3 3 0 0 1 2.8-2h8.4A3 3 0 0 1 19 9l2 6v3a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-11v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="7.5" cy="14" r="1.2" fill="currentColor"/><circle cx="16.5" cy="14" r="1.2" fill="currentColor"/></svg>
+      <span><span data-l="en">Made for a Toyota with only an FM radio.</span><span data-l="ar">صُنع لسيارة تويوتا لا يوجد فيها إلا راديو FM.</span></span>
+    </div>
+    <div><a href="https://github.com/Devehab/PiWave">GitHub</a> · <span data-l="en">Transmitter: PiFmRds, GPL-3.0</span><span data-l="ar">برنامج البث: PiFmRds برخصة GPL-3.0</span></div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var doc = document.documentElement;
+  doc.classList.add("js");
+
+  /* ---------------- language ---------------- */
+  var META = {
+    en: { title: "PiWave — Your car's private FM station, from a Raspberry Pi",
+          desc: "PiWave turns a ~$15 Raspberry Pi Zero 2 W and one 20 cm wire into a tiny private FM station for your car: your music, your voice, Bluetooth and RDS, controlled from your phone with no internet.",
+          copy: "Copy", copied: "Copied", radio: "Animated car radio tuning to {f} MHz, station {ps}" },
+    ar: { title: "PiWave — محطة FM خاصة لسيارتك من راسبيري باي",
+          desc: "يحوّل PiWave جهاز راسبيري باي Zero 2 W وسلكًا بطول 20 سم إلى محطة FM صغيرة وخاصة بسيارتك: أغانيك وصوتك والبلوتوث وRDS، من هاتفك ومن دون إنترنت.",
+          copy: "نسخ", copied: "تم النسخ", radio: "راديو سيارة متحرك مضبوط على {f} ميغاهيرتز، المحطة {ps}" }
+  };
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+  function setLang(l, save) {
+    if (l !== "ar") l = "en";
+    doc.lang = l;
+    doc.dir = l === "ar" ? "rtl" : "ltr";
+    document.title = META[l].title;
+    var d = document.querySelector('meta[name="description"]');
+    if (d) d.setAttribute("content", META[l].desc);
+    document.querySelectorAll("[data-set-lang]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.setLang === l)); });
+    document.querySelectorAll(".copy").forEach(function (b) { if (!b.classList.contains("done")) b.innerHTML = COPY_ICON + META[l].copy; });
+    if (save) store("piwave-lang", l);
+    updateRadioLabel();
+  }
+  var COPY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+  document.querySelectorAll("[data-set-lang]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      setLang(b.dataset.setLang, true);
+      try { var u = new URL(location.href); u.searchParams.delete("lang"); history.replaceState(null, "", u); } catch (e) { /* old browser */ }
+    });
+  });
+
+  /* ---------------- copy buttons ---------------- */
+  function copyText(t) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t);
+    return new Promise(function (res, rej) {
+      var ta = document.createElement("textarea");
+      ta.value = t; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:0;opacity:0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy") ? res() : rej(); } catch (e) { rej(e); }
+      document.body.removeChild(ta);
+    });
+  }
+  document.querySelectorAll(".copy").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var code = b.parentNode.querySelector("code").textContent.trim();
+      copyText(code).then(function () {
+        b.classList.add("done");
+        b.innerHTML = COPY_ICON + META[doc.lang].copied;
+        b.setAttribute("aria-live", "polite");
+        setTimeout(function () { b.classList.remove("done"); b.innerHTML = COPY_ICON + META[doc.lang].copy; }, 1800);
+      }, function () { /* clipboard blocked: the text is still selectable */ });
+    });
+  });
+
+  /* ---------------- pin header drawing ---------------- */
+  (function pinout() {
+    var x0 = 46, dx = 14.2, yOut = 30, yIn = 45, pins = "";
+    function fill(n) { return n === 7 ? "#f5a524" : (n === 2 || n === 4) ? "#ff5d5d" : n === 1 ? "#ffb547" : [6, 9, 14, 20, 25, 30, 34, 39].indexOf(n) >= 0 ? "#111" : "#c9a86a"; }
+    for (var i = 0; i < 20; i++) {
+      var odd = 2 * i + 1, even = 2 * i + 2;
+      pins += '<rect x="' + (x0 + i * dx - 4.5) + '" y="' + (yIn - 4.5) + '" width="9" height="9" rx="' + (odd === 1 ? 0 : 4.5) + '" fill="' + fill(odd) + '" stroke="#0007"/>';
+      pins += '<rect x="' + (x0 + i * dx - 4.5) + '" y="' + (yOut - 4.5) + '" width="9" height="9" rx="4.5" fill="' + fill(even) + '" stroke="#0007"/>';
+    }
+    var p7 = x0 + 3 * dx, t = 'font-family="Inter, IBM Plex Sans Arabic, sans-serif"';
+    document.getElementById("pinout").innerHTML =
+      '<rect x="22" y="14" width="340" height="132" rx="12" fill="#1f5c3a" stroke="#2f7d52"/>' +
+      '<rect x="8" y="58" width="26" height="46" rx="3" fill="#8b919c"/><text x="21" y="85" font-size="9" text-anchor="middle" fill="#111" ' + t + '>SD</text>' +
+      '<rect x="' + (x0 - 9) + '" y="' + (yOut - 9) + '" width="' + (19 * dx + 18) + '" height="' + (yIn - yOut + 18) + '" rx="3" fill="#0d2f1e"/>' + pins +
+      '<circle cx="' + p7 + '" cy="' + yIn + '" r="9" fill="none" stroke="#f5a524" stroke-width="2.4"><animate attributeName="r" values="8;12;8" dur="1.6s" repeatCount="indefinite"/></circle>' +
+      '<path d="M' + p7 + ' ' + yIn + ' C ' + p7 + ' ' + (yIn + 40) + ', ' + (p7 + 60) + ' ' + (yIn + 30) + ', ' + (p7 + 110) + ' ' + (yIn + 55) + '" fill="none" stroke="#f5a524" stroke-width="3" stroke-linecap="round"/>' +
+      '<text x="' + (p7 + 116) + '" y="' + (yIn + 60) + '" font-size="12" fill="#f5a524" font-weight="700" ' + t + '><tspan data-l="en">20 cm wire → pin 7</tspan><tspan data-l="ar">سلك 20 سم ← الرجل 7</tspan></text>' +
+      '<text x="' + (p7 + 116) + '" y="' + (yIn + 76) + '" font-size="10" fill="#cfd3da" ' + t + '><tspan data-l="en">other end free</tspan><tspan data-l="ar">الطرف الآخر حر</tspan></text>' +
+      '<text x="' + x0 + '" y="' + (yIn + 18) + '" font-size="9" text-anchor="middle" fill="#ffb547" ' + t + '>1</text>' +
+      '<text x="' + p7 + '" y="' + (yIn + 18) + '" font-size="10" text-anchor="middle" fill="#f5a524" font-weight="700" ' + t + '>7</text>' +
+      '<text x="' + x0 + '" y="' + (yOut - 11) + '" font-size="9" text-anchor="middle" fill="#ff8a8a" ' + t + '>2·5V</text>' +
+      '<text x="' + (x0 + 2 * dx) + '" y="' + (yOut - 11) + '" font-size="9" text-anchor="middle" fill="#cfd3da" ' + t + '>6·GND</text>' +
+      '<rect x="58" y="128" width="40" height="20" rx="3" fill="#8b919c"/><text x="78" y="162" font-size="9" text-anchor="middle" fill="#cfd3da" ' + t + '>HDMI</text>' +
+      '<rect x="232" y="130" width="30" height="16" rx="3" fill="#8b919c"/><text x="247" y="162" font-size="9" text-anchor="middle" fill="#cfd3da" ' + t + '>USB</text>' +
+      '<rect x="290" y="130" width="30" height="16" rx="3" fill="#34c77b"/><text x="305" y="162" font-size="9" text-anchor="middle" fill="#34c77b" font-weight="700" ' + t + '>PWR IN</text>' +
+      '<text x="305" y="178" font-size="9.5" text-anchor="middle" fill="#34c77b" ' + t + '><tspan data-l="en">power here</tspan><tspan data-l="ar">الكهرباء هنا</tspan></text>';
+  })();
+
+  /* ---------------- the radio ---------------- */
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var radio = document.getElementById("radio"), lcdF = document.getElementById("lcdF"),
+      lcdPS = document.getElementById("lcdPS"), lcdRT = document.getElementById("lcdRT"),
+      needle = document.getElementById("dialN"), knob = document.getElementById("knob");
+  var LO = 88, HI = 108, cur = 88.0, anim = 0, station = null;
+  var PRESETS = [
+    { f: 107.9, ps: "PI RADIO", rt: "3mrw Dyab - Tmly M3ak" },
+    { f: 88.1, ps: "LIVE", rt: "LIVE - Hold the button and talk" },
+    { f: 99.5, ps: "PI RADIO", rt: "Elissa - Gouwaya Leik" },
+    { f: 103.7, ps: "PI RADIO", rt: "Voice note - Welcome aboard!" }
+  ];
+  function show(f) {
+    cur = f;
+    lcdF.textContent = f.toFixed(1);
+    needle.style.left = (Math.min(101, Math.max(-1, (f - LO) / (HI - LO) * 100))) + "%";
+    knob.style.transform = "rotate(" + ((f - LO) * 16) + "deg)";
+  }
+  function updateRadioLabel() {
+    if (!station) return;
+    radio.setAttribute("aria-label", META[doc.lang].radio.replace("{f}", station.f.toFixed(1)).replace("{ps}", station.ps));
+  }
+  function lock(p) {
+    station = p;
+    lcdPS.textContent = p.ps;
+    lcdRT.textContent = p.rt;
+    lcdRT.style.animation = "none"; void lcdRT.offsetWidth; lcdRT.style.animation = "";
+    radio.classList.remove("tuning");
+    radio.classList.add("locked");
+    updateRadioLabel();
+  }
+  function tune(p, ms) {
+    cancelAnimationFrame(anim);
+    if (reduce || !ms) { show(p.f); lock(p); return; }
+    var from = cur, to = p.f, t0 = performance.now();
+    radio.classList.remove("locked");
+    radio.classList.add("tuning");
+    function ease(t) { var c1 = 1.4, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }  // easeOutBack: a little overshoot like a real needle
+    (function step(now) {
+      var t = Math.min(1, (now - t0) / ms);
+      show(from + (to - from) * ease(t));
+      if (t < 1) anim = requestAnimationFrame(step); else { show(to); lock(p); }
+    })(t0);
+  }
+  var presetBtns = document.querySelectorAll("#presets button");
+  presetBtns.forEach(function (b) {
+    b.addEventListener("click", function () {
+      presetBtns.forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      var p = PRESETS[+b.dataset.p];
+      tune(p, 500 + Math.abs(p.f - cur) * 45);
+    });
+  });
+  show(88.0);
+  setTimeout(function () { tune(PRESETS[0], 2300); }, 350);
+
+  /* ---------------- scroll tuner + active preset ---------------- */
+  var tn = document.getElementById("tn"), tt = document.getElementById("tt");
+  var navLinks = document.querySelectorAll(".presets-nav a");
+  var secs = Array.prototype.slice.call(document.querySelectorAll("section[data-f]"));
+  var ticking = false;
+  function onScroll() {
+    ticking = false;
+    var max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
+    var p = Math.min(1, Math.max(0, scrollY / max));
+    var bar = tn.parentNode.clientWidth - 32;
+    var x = 16 + p * bar;
+    tn.style.left = x + "px";
+    var f = 88 + p * 20;
+    var name = "";
+    for (var i = secs.length - 1; i >= 0; i--) {
+      if (secs[i].getBoundingClientRect().top < innerHeight * 0.35) { name = secs[i].id; break; }
+    }
+    tt.textContent = f.toFixed(1) + " FM";
+    var w = tt.offsetWidth;
+    tt.style.left = Math.min(bar + 16 - w, Math.max(16, x + 8)) + "px";
+    navLinks.forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + name); });
+  }
+  addEventListener("scroll", function () { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
+  addEventListener("resize", onScroll);
+
+  /* ---------------- reveal on scroll ---------------- */
+  var els = document.querySelectorAll(".reveal");
+  if (!reduce && "IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { rootMargin: "0px 0px -8% 0px" });
+    els.forEach(function (e) { io.observe(e); });
+  } else {
+    els.forEach(function (e) { e.classList.add("in"); });
+  }
+
+  /* ---------------- start ---------------- */
+  var q = null;
+  try { q = new URLSearchParams(location.search).get("lang"); } catch (e) { /* old browser */ }
+  setLang(q || store("piwave-lang") || "en", false);
+  onScroll();
+})();
+</script>
+</body>
+</html>

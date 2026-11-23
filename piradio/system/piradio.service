@@ -1,0 +1,21 @@
+[Unit]
+Description=PiRadio - FM transmitter with web control
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+# never give up restarting (the launcher rolls back a broken update after 3 crashes)
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/piradio-launch
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1 LANG=C.UTF-8 LC_ALL=C.UTF-8
+Environment=PIRADIO_BASE=/opt/piradio PIRADIO_DATA=/var/lib/piradio TMPDIR=/var/lib/piradio/tmp
+RuntimeDirectory=piradio
+# keep audio smooth even while uploads are being written to the SD card
+Nice=-5
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

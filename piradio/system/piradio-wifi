@@ -1,0 +1,34 @@
+#!/bin/bash
+# Switch the Pi's Wi-Fi between its own hotspot and the home network.
+#   piradio-wifi hotspot   -> become the "PiRadio" Wi-Fi (default after every boot)
+#   piradio-wifi home      -> join a saved home Wi-Fi until the next reboot
+#                             (falls back to the hotspot if none is reachable)
+#   piradio-wifi status
+HOT=PiRadio-Hotspot
+case "${1:-status}" in
+  hotspot)
+    nmcli connection up "$HOT"
+    ;;
+  home)
+    # every saved Wi-Fi connection that is not the hotspot (by UUID: names may contain ':')
+    mapfile -t UUIDS < <(nmcli -t -f UUID,TYPE,NAME connection show \
+      | awk -F: -v hot="$HOT" '$2=="802-11-wireless" && $3!=hot {print $1}')
+    for u in "${UUIDS[@]}"; do
+      echo "trying $(nmcli -g connection.id connection show uuid "$u")..."
+      if nmcli --wait 45 connection up uuid "$u"; then
+        echo "connected to home Wi-Fi (the hotspot comes back after a reboot)"
+        exit 0
+      fi
+    done
+    echo "no home Wi-Fi reachable: going back to the hotspot"
+    nmcli connection up "$HOT"
+    exit 1
+    ;;
+  status)
+    nmcli -t -f NAME,TYPE,DEVICE connection show --active
+    ;;
+  *)
+    echo "usage: piradio-wifi hotspot|home|status"
+    exit 2
+    ;;
+esac

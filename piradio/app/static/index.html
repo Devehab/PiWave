@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>راديو السيارة</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23f5a524'/%3E%3Cpath d='M6 9h12v9H6z' fill='%230f1115'/%3E%3Ccircle cx='10' cy='13.5' r='2' fill='%23f5a524'/%3E%3Cpath d='M7 8l9-4' stroke='%230f1115' stroke-width='1.6'/%3E%3C/svg%3E">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4.5" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4.5" height="14" rx="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M5 6.2v11.6a.8.8 0 0 0 1.25.66L14.5 12.7a.8.8 0 0 0 0-1.4L6.25 5.54A.8.8 0 0 0 5 6.2z" fill="currentColor"/><rect x="16" y="5" width="3" height="14" rx="1" fill="currentColor"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M19 6.2v11.6a.8.8 0 0 1-1.25.66L9.5 12.7a.8.8 0 0 1 0-1.4l8.25-5.76A.8.8 0 0 1 19 6.2z" fill="currentColor"/><rect x="5" y="5" width="3" height="14" rx="1" fill="currentColor"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M4 7h3.5c2 0 3 1 4.2 2.8l1.6 2.4c1.2 1.8 2.2 2.8 4.2 2.8H20M17 12l3 3-3 3M4 17h3.5c1.2 0 2-.4 2.7-1.1M13.8 8.1C14.5 7.4 15.3 7 16.5 7H20M17 4l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 3l3 3-3 3M20 6H8a4 4 0 0 0-4 4v1M7 21l-3-3 3-3M4 18h12a4 4 0 0 0 4-4v-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-radio" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="14" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M14.5 12.5h3.5M14.5 15.5h3.5M6 8l11-4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5.5l11-2V16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="17.5" cy="16" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2L5.5 5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8M7 6.3a7.5 7.5 0 1 0 10 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="brand"><svg><use href="#i-radio"/></svg><span>راديو السيارة</span></div>
+  <div id="air" class="air off" role="status"><i></i><span id="air-text">…</span></div>
+</header>
+
+<main>
+<!-- ============================ RADIO ============================ -->
+<section id="tab-radio" class="tab active">
+  <div class="card dial">
+    <div class="dial-top">
+      <span class="muted">التردد</span>
+      <button id="tx-toggle" class="pill-btn" type="button"><svg><use href="#i-power"/></svg><span>…</span></button>
+    </div>
+    <div class="freq" dir="ltr"><span id="freq-num">---.-</span><small>MHz FM</small></div>
+    <div id="freq-pending" class="pending hidden">
+      <span>التردد الجديد: <b dir="ltr" id="freq-draft"></b></span>
+      <button id="freq-apply" class="btn primary small" type="button">تطبيق</button>
+      <button id="freq-cancel" class="btn ghost small" type="button">إلغاء</button>
+    </div>
+    <div class="stepper" dir="ltr">
+      <button type="button" data-step="-1">−1</button>
+      <button type="button" data-step="-0.1">−0.1</button>
+      <input id="freq-input" type="number" inputmode="decimal" step="0.1" min="76" max="108" aria-label="التردد">
+      <button type="button" data-step="0.1">+0.1</button>
+      <button type="button" data-step="1">+1</button>
+    </div>
+    <p class="car-hint" id="car-hint"></p>
+  </div>
+
+  <div class="card now">
+    <div class="now-head">
+      <div class="art" id="art"><svg><use href="#i-music"/></svg><div class="eq"><i></i><i></i><i></i><i></i></div></div>
+      <div class="now-text">
+        <div class="now-title" id="now-title">ما في شي شغال</div>
+        <div class="now-artist muted" id="now-artist">ارفع أغاني من تبويب «الأغاني»</div>
+      </div>
+    </div>
+    <div class="seek" dir="ltr">
+      <input id="seek" type="range" min="0" max="100" step="0.5" value="0" aria-label="مكان الأغنية">
+      <div class="times" dir="ltr"><span id="t-pos">0:00</span><span id="t-dur">0:00</span></div>
+    </div>
+    <div class="controls" dir="ltr">
+      <button id="b-shuffle" class="icon-btn" type="button" title="عشوائي"><svg><use href="#i-shuffle"/></svg></button>
+      <button id="b-prev" class="icon-btn" type="button" title="السابقة"><svg><use href="#i-prev"/></svg></button>
+      <button id="b-play" class="play-btn" type="button" title="تشغيل"><svg><use href="#i-play"/></svg></button>
+      <button id="b-next" class="icon-btn" type="button" title="التالية"><svg><use href="#i-next"/></svg></button>
+      <button id="b-repeat" class="icon-btn" type="button" title="تكرار"><svg><use href="#i-repeat"/></svg><b id="repeat-one" class="hidden">1</b></button>
+    </div>
+    <div class="vol" dir="ltr">
+      <svg><use href="#i-vol"/></svg>
+      <input id="volume" type="range" min="0" max="100" step="5" aria-label="الصوت">
+      <span id="vol-val" dir="ltr">100%</span>
+    </div>
+    <div class="meter" dir="ltr" title="مستوى الصوت الداخل على المرسل"><i id="meter"></i></div>
+    <div id="player-error" class="err hidden"></div>
+  </div>
+
+  <div class="quick">
+    <button id="q-record" class="card quick-btn" type="button"><svg><use href="#i-mic"/></svg><span>سجّل صوتك<small>وابعثه على الراديو</small></span></button>
+    <button id="q-tone" class="card quick-btn" type="button"><svg><use href="#i-bell"/></svg><span>نغمة اختبار<small>تأكد إنك سامع</small></span></button>
+  </div>
+</section>
+
+<!-- ============================ SONGS ============================ -->
+<section id="tab-songs" class="tab">
+  <div class="card">
+    <label class="btn primary block upload-btn">
+      <svg><use href="#i-upload"/></svg> ارفع أغاني من الموبايل
+      <input id="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus" multiple hidden>
+    </label>
+    <p class="muted small-text">MP3، M4A، WAV، FLAC، OGG… تقدر تختار أكثر من ملف. ولو زر الرفع ما فتح الملفات، افتح هالصفحة بمتصفح سفاري أو كروم على <b dir="ltr">http://192.168.4.1</b>.</p>
+    <div id="uploads"></div>
+  </div>
+  <div class="card list-card">
+    <div class="list-head">
+      <b>المكتبة <span class="muted" id="lib-count"></span></b>
+      <input id="search" type="search" placeholder="بحث…" aria-label="بحث">
+    </div>
+    <ul id="tracks" class="tracks"></ul>
+    <div id="lib-empty" class="empty hidden">
+      <svg><use href="#i-music"/></svg>
+      <p>المكتبة فاضية.<br>ارفع أغاني من فوق، أو انسخها على الكرت بمجلد <b dir="ltr">piradio-music</b>.</p>
+    </div>
+    <ul id="bad-tracks" class="tracks bad"></ul>
+  </div>
+</section>
+
+<!-- ============================ CHECK ============================ -->
+<section id="tab-check" class="tab">
+  <div class="card">
+    <h2>هل البث شغال؟</h2>
+    <ul class="checks" id="checks"></ul>
+    <div class="meter big" dir="ltr"><i id="meter2"></i></div>
+    <p class="muted small-text">العدّاد بيتحرك لما يكون في صوت داخل على المرسل.</p>
+    <button id="c-tone" class="btn primary block" type="button"><svg><use href="#i-bell"/></svg> شغّل نغمة اختبار 20 ثانية</button>
+    <details class="txlog"><summary>رسائل برنامج البث</summary><pre id="txlog" dir="ltr"></pre></details>
+  </div>
+
+  <div class="card">
+    <h2>بالسيارة: كيف تسمع</h2>
+    <ol class="steps" id="car-steps"></ol>
+  </div>
+
+  <div class="card">
+    <h2>السلك والمدى على <span dir="ltr" class="accent" id="ant-freq"></span></h2>
+    <p class="muted small-text">بين 88 و 108 ميغاهيرتز، تغيير التردد تقريباً ما بيغيّر المدى. اللي بيفرق هو <b>طول السلك</b>.</p>
+    <table class="ant">
+      <thead><tr><th>طول السلك</th><th>المدى التقريبي</th><th></th></tr></thead>
+      <tbody id="ant-rows"></tbody>
+    </table>
+    <p class="muted small-text" id="ant-note"></p>
+  </div>
+
+  <div class="card">
+    <h2>وين أوصل السلك؟</h2>
+    <div class="pinout" id="pinout"></div>
+    <ul class="bullets">
+      <li>السلك على <b>الرجل رقم 7</b> (GPIO4) <b>بس</b>، وطرفه التاني حر بالهوا.</li>
+      <li>الرجل رقم 7 هي <b>الرابعة</b> بالصف الداخلي، من جهة كرت الذاكرة.</li>
+      <li><b class="bad-text">لا</b> تلمس الرجل 2 و 4 (5V) ولا 6 و 9 (GND): ممكن تحرق اللوحة.</li>
+      <li>الكهربا على منفذ <b>PWR IN</b> (الطرفي)، مش منفذ USB اللي بالنص.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ SETTINGS ============================ -->
+<section id="tab-settings" class="tab">
+  <div class="card">
+    <h2>شاشة راديو السيارة (RDS)</h2>
+    <label class="field"><span>اسم المحطة (8 أحرف إنجليزي)</span>
+      <input id="s-ps" maxlength="8" dir="ltr" autocomplete="off"></label>
+    <label class="switch"><input type="checkbox" id="s-rt"><span>اعرض اسم الأغنية كنص (RadioText)</span></label>
+    <label class="switch"><input type="checkbox" id="s-scroll"><span>اعرض اسم الأغنية مكان اسم المحطة (لو راديوك ما بعرض النص)</span></label>
+    <label class="field"><span>النص لما ما في أغنية</span><input id="s-radiotext" maxlength="64" dir="ltr"></label>
+    <p class="muted small-text">شاشة الراديو ما بتعرض حروف عربية، فالأسماء العربية بتطلع بالعربيزي (مثل 3mr Diab).</p>
+    <button id="s-save-rds" class="btn primary" type="button">حفظ</button>
+  </div>
+
+  <div class="card">
+    <h2>الصوت والتشغيل</h2>
+    <label class="field"><span>Pre-emphasis</span>
+      <select id="s-pre">
+        <option value="50">50µs: الشرق الأوسط وأوروبا (الافتراضي)</option>
+        <option value="75">75µs: سيارات أمريكية</option>
+        <option value="off">بدون</option>
+      </select></label>
+    <label class="switch"><input type="checkbox" id="s-txboot"><span>ابدأ البث أول ما يشتغل الجهاز</span></label>
+    <label class="switch"><input type="checkbox" id="s-autoplay"><span>كمّل آخر أغنية أول ما يشتغل الجهاز</span></label>
+    <details><summary class="muted">إعدادات متقدمة</summary>
+      <label class="field"><span>رمز PI</span><input id="s-pi" maxlength="4" dir="ltr"></label>
+      <label class="field"><span>تصحيح الكريستال (ppm)</span><input id="s-ppm" type="number" step="1" dir="ltr"></label>
+    </details>
+    <button id="s-save-audio" class="btn primary" type="button">حفظ</button>
+  </div>
+
+  <div class="card">
+    <h2>شبكة الواي فاي</h2>
+    <label class="field"><span>اسم الشبكة</span><input id="w-ssid" dir="ltr" maxlength="32" autocomplete="off"></label>
+    <label class="field"><span>كلمة السر (8 أحرف على الأقل)</span><input id="w-pass" dir="ltr" maxlength="63" autocomplete="off"></label>
+    <button id="w-save" class="btn primary" type="button">حفظ وإعادة تشغيل الشبكة</button>
+    <p class="muted small-text">بعد الحفظ موبايلك رح ينفصل. اتصل بالشبكة الجديدة.</p>
+    <button id="w-home" class="btn ghost block" type="button">اتصل بواي فاي البيت لحد إعادة التشغيل</button>
+  </div>
+
+  <div class="card">
+    <h2>التحديث</h2>
+    <div class="version-row">
+      <div><span class="muted">الإصدار الحالي</span><b id="v-cur" dir="ltr">…</b></div>
+      <div><span class="muted">الإصدار السابق</span><b id="v-prev" dir="ltr">—</b></div>
+    </div>
+    <div id="v-result" class="note hidden"></div>
+    <label class="btn primary block upload-btn">
+      <svg><use href="#i-upload"/></svg> ارفع ملف التحديث
+      <input id="update-input" type="file" accept=".gz,.tgz,.zip,application/gzip,application/zip" hidden>
+    </label>
+    <div id="update-progress" class="hidden"><div class="bar"><i></i></div><p class="muted small-text" id="update-text"></p><pre id="update-log" dir="ltr" class="hidden"></pre></div>
+    <p class="muted small-text">الملف اسمه مثل <b dir="ltr">piradio-update-1.0.1.tar.gz</b>. الجهاز بيفحصه قبل ما يثبّته، وإذا النسخة الجديدة ما اشتغلت، بيرجع للقديمة لحاله.</p>
+    <div class="row">
+      <button id="v-rollback" class="btn ghost" type="button">ارجع للإصدار السابق</button>
+      <a id="v-logs" class="btn ghost" href="/api/logs" download>تنزيل سجل الأخطاء</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>الجهاز</h2>
+    <ul class="kv" id="sys"></ul>
+    <div class="row">
+      <button id="p-reboot" class="btn ghost" type="button">إعادة تشغيل</button>
+      <button id="p-off" class="btn danger" type="button">إطفاء آمن</button>
+    </div>
+    <p class="muted small-text">قبل ما تفصل الكهربا، الأفضل تعمل «إطفاء آمن» وتستنى 20 ثانية، عشان ما يخرب كرت الذاكرة.</p>
+  </div>
+</section>
+</main>
+
+<nav class="tabs">
+  <button data-tab="radio" class="active" type="button"><svg><use href="#i-radio"/></svg>الراديو</button>
+  <button data-tab="songs" type="button"><svg><use href="#i-music"/></svg>الأغاني</button>
+  <button data-tab="check" type="button"><svg><use href="#i-pulse"/></svg>الفحص</button>
+  <button data-tab="settings" type="button"><svg><use href="#i-gear"/></svg>الإعدادات</button>
+</nav>
+
+<!-- ============================ RECORD SHEET ============================ -->
+<div id="rec" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="rec-title">
+  <div class="sheet-body card">
+    <div class="sheet-head"><h2 id="rec-title">سجّل وابعث على الراديو</h2><button class="x" id="rec-close" type="button" aria-label="إغلاق">✕</button></div>
+    <div id="rec-ok">
+      <div class="rec-timer" dir="ltr" id="rec-time">00:00</div>
+      <div class="rec-wave"><i id="rec-level"></i></div>
+      <button id="rec-btn" class="rec-btn" type="button" aria-label="تسجيل"><span></span></button>
+      <p class="muted center" id="rec-hint">اضغط الزر الأحمر وابدأ احكي</p>
+      <div id="rec-done" class="hidden">
+        <audio id="rec-audio" controls></audio>
+        <label class="field"><span>اسم التسجيل</span><input id="rec-name"></label>
+        <button id="rec-send" class="btn primary block" type="button">📡 ابعثه على الراديو هلأ</button>
+        <label class="switch"><input type="checkbox" id="rec-loop"><span>كرّره بشكل متواصل</span></label>
+        <button id="rec-save" class="btn ghost block" type="button">احفظه بالمكتبة بس</button>
+      </div>
+    </div>
+    <div id="rec-insecure" class="hidden">
+      <p>المتصفح بيسمح بالمايكروفون بس على <b>الرابط الآمن</b> للجهاز.</p>
+      <a id="rec-https" class="btn primary block" href="#">افتح الرابط الآمن</a>
+      <p class="muted small-text">رح يطلعلك تحذير إنه «الاتصال مش خاص». هاد طبيعي لأنه الجهاز تبعك ومش موقع على الإنترنت. اختار <b>Show Details ← visit this website</b> بالآيفون، أو <b>Advanced ← Proceed</b> بالأندرويد.</p>
+      <hr>
+      <p>أو سجّل بتطبيق التسجيل اللي على موبايلك وارفع الملف:</p>
+      <label class="btn ghost block upload-btn">🎙️ سجّل بتطبيق الموبايل / اختار تسجيل
+        <input id="rec-capture" type="file" accept="audio/*" capture hidden></label>
+    </div>
+  </div>
+</div>
+
+<div id="overlay" class="overlay hidden"><div class="spinner"></div><p id="overlay-text"></p></div>
+<div id="toast" class="toast hidden" role="alert"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

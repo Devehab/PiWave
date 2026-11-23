@@ -1,0 +1,11 @@
+#!/bin/bash
+# systemd ExecStart for PiRadio.
+# 1) crash guard: if a fresh update keeps crashing, roll back to the previous version
+# 2) renew the HTTPS certificate if it is about to expire
+# 3) run the current version
+LIB=/usr/local/lib/piradio
+/usr/bin/python3 "$LIB/updater.py" launch-check || true
+"$LIB/make-cert.sh" --if-needed >/dev/null 2>&1 || true
+REL=$(readlink -f /opt/piradio/current)
+export PIRADIO_TX="$REL/bin/pi_fm_rds"
+exec /usr/bin/python3 "$REL/app/main.py"

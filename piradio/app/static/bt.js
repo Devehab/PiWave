@@ -2,13 +2,14 @@
 /* Bluetooth panel: status, pairing mode, paired phones (connect / disconnect /
    unpair), settings. Shared by the main page (sheet) and the welcome page. */
 (function () {
+  const t = window.I18N.t;
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   async function post(path, body) {
     const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
     let j = null;
     try { j = await r.json(); } catch (_) { /* not json */ }
-    if (!r.ok || (j && j.ok === false)) throw new Error((j && j.error) || ("خطأ " + r.status));
+    if (!r.ok || (j && j.ok === false)) throw new Error((j && j.error) || ("Error " + r.status));
     return j;
   }
 
@@ -24,7 +25,7 @@
         pairingEnd = st.pairing_left ? Date.now() + st.pairing_left * 1000 : 0;
         if (st.just_paired && st.just_paired !== lastJust) {
           lastJust = st.just_paired;
-          toast(`✓ تم الاقتران مع ${st.just_paired}`, "ok");
+          toast(t("bt_just_paired", { name: st.just_paired }), "ok");
         }
         render();
       } catch (_) { /* offline: try again */ }
@@ -44,63 +45,59 @@
       if (!st.installed) {
         const ins = st.install || {};
         return `
-          <div class="note">البلوتوث مش مثبت على هالجهاز لسا. بيتثبت مرة وحدة، وبده إنترنت.</div>
-          <ol class="steps small-text">
-            <li>من «الإعدادات» اضغط «اتصل بواي فاي البيت».</li>
-            <li>من شبكة البيت افتح <b dir="ltr">http://piradio.local</b> وارجع لهون.</li>
-            <li>اضغط الزر تحت واستنى 5–10 دقايق.</li>
-          </ol>
-          ${ins.running ? `<div class="note">⏳ جاري تثبيت البلوتوث… لا تطفي الجهاز.</div>` : ""}
-          ${ins.ok === true ? `<div class="note ok">✓ انثبت البلوتوث</div>` : ""}
-          ${ins.ok === false ? `<div class="note bad">✕ ما زبط التثبيت</div><pre dir="ltr">${esc(ins.log)}</pre>` : ""}
-          <button class="btn primary block" type="button" data-act="install" ${ins.running ? "disabled" : ""}>ثبّت البلوتوث</button>`;
+          <div class="note">${t("bt_not_installed")}</div>
+          <ol class="steps small-text"><li>${t("bt_inst_1")}</li><li>${t("bt_inst_2")}</li><li>${t("bt_inst_3")}</li></ol>
+          ${ins.running ? `<div class="note">${t("bt_installing")}</div>` : ""}
+          ${ins.ok === true ? `<div class="note ok">${t("bt_installed")}</div>` : ""}
+          ${ins.ok === false ? `<div class="note bad">${t("bt_inst_fail")}</div><pre dir="auto">${esc(ins.log)}</pre>` : ""}
+          <button class="btn primary block" type="button" data-act="install" ${ins.running ? "disabled" : ""}>${t("bt_install")}</button>`;
       }
       let h = "";
-      if (full) h += `<label class="switch"><input type="checkbox" data-set="bt_enabled" ${st.enabled ? "checked" : ""}><span>البلوتوث شغال</span></label>`;
-      if (!st.enabled) return h + `<div class="note">البلوتوث مطفي. شغّله لتقدر توصل تلفونك.</div>`;
+      if (full) h += `<label class="switch"><input type="checkbox" data-set="bt_enabled" ${st.enabled ? "checked" : ""}><span>${t("bt_on")}</span></label>`;
+      if (!st.enabled) return h + `<div class="note">${t("bt_is_off")}</div>`;
       if (!st.available) {
-        return h + `<div class="note bad">${esc(st.error || "البلوتوث مش جاهز")}</div>
-          <button class="btn ghost block" type="button" data-act="retry">جرّب مرة ثانية</button>`;
+        return h + `<div class="note bad">${esc(st.error || t("bt_not_ready"))}</div>
+          <button class="btn ghost block" type="button" data-act="retry">${t("bt_retry")}</button>`;
       }
       const devs = st.devices || [];
       const conn = devs.find((d) => d.connected);
       const sub = conn
-        ? (st.on_air ? "صوت التلفون عم ينبث على الراديو" : st.suppressed ? "الراديو على أغاني الجهاز هلأ. وقّف وشغّل بالتلفون ليرجع عليه" : "شغّل أي صوت بالتلفون وبيطلع على الراديو")
-        : `دوّر عليه بالتلفون باسم <b dir="auto">${esc(st.name)}</b>`;
+        ? (st.on_air ? t("bt_on_air") : st.suppressed ? t("bt_suppressed") : t("bt_hint"))
+        : t("bt_find", { name: esc(st.name) });
       h += `<div class="bt-state ${conn ? "on" : ""}"><span class="bt-ico"><svg><use href="#i-bt"/></svg></span>
-              <div><b>${conn ? "متصل: " + esc(conn.name) : "ما في تلفون متصل"}</b><small>${sub}</small></div></div>`;
+              <div><b dir="auto">${conn ? t("bt_conn_to", { name: esc(conn.name) }) : t("bt_none")}</b><small>${sub}</small></div></div>`;
       if (st.pairing_left) {
         h += `<div class="pairing">
-            <div class="pairing-head"><span class="pulse"></span><b>وضع الاقتران شغال</b><span class="muted" dir="ltr" data-left>${mmss(st.pairing_left)}</span></div>
+            <div class="pairing-head"><span class="pulse"></span><b>${t("bt_pairing_on")}</b><span class="muted" dir="ltr" data-left>${mmss(st.pairing_left)}</span></div>
             <ol class="steps small-text">
-              <li>بالتلفون افتح <b>الإعدادات ← البلوتوث</b> (Bluetooth).</li>
-              <li>اختار <b dir="auto">${esc(st.name)}</b> من القائمة.</li>
-              <li>خلص! شغّل أي أغنية بالتلفون وبتطلع على راديو السيارة.</li>
+              <li>${t("bt_pair_1")}</li>
+              <li>${t("bt_pair_2", { name: esc(st.name) })}</li>
+              <li>${t("bt_pair_3")}</li>
             </ol>
-            <button class="btn ghost block" type="button" data-act="pair-off">أوقف وضع الاقتران</button>
+            <button class="btn ghost block" type="button" data-act="pair-off">${t("bt_pair_off")}</button>
           </div>`;
       } else {
-        h += `<button class="btn primary block" type="button" data-act="pair-on"><svg><use href="#i-bt"/></svg> وصّل تلفون جديد (وضع الاقتران)</button>`;
+        h += `<button class="btn primary block" type="button" data-act="pair-on"><svg><use href="#i-bt"/></svg> ${t("bt_pair_on")}</button>`;
       }
-      h += `<h3 class="sub-h">الأجهزة المقترنة</h3>`;
-      if (!devs.length) h += `<p class="muted small-text">ما في أجهزة مقترنة لسا. اضغط «وصّل تلفون جديد».</p>`;
+      h += `<h3 class="sub-h">${t("bt_paired")}</h3>`;
+      if (!devs.length) h += `<p class="muted small-text">${t("bt_no_devs")}</p>`;
       else {
         h += `<ul class="devs">` + devs.map((d) => `
           <li class="${d.connected ? "on" : ""}">
             <span class="dev-ico"><svg><use href="#i-phone"/></svg></span>
-            <div class="dev-main"><b dir="auto">${esc(d.name)}</b><small>${d.connected ? (d.playing ? "متصل · عم يشغّل صوت" : "متصل") : "مقترن · مش متصل"}</small></div>
+            <div class="dev-main"><b dir="auto">${esc(d.name)}</b><small>${d.connected ? (d.playing ? t("bt_dev_playing") : t("bt_dev_conn")) : t("bt_dev_off")}</small></div>
             ${d.connected
-              ? `<button class="btn small ghost" type="button" data-act="disconnect" data-mac="${esc(d.mac)}">افصل</button>`
-              : `<button class="btn small" type="button" data-act="connect" data-mac="${esc(d.mac)}">اتصل</button>`}
-            <button class="t-btn del" type="button" data-act="remove" data-mac="${esc(d.mac)}" data-name="${esc(d.name)}" title="فك الاقتران" aria-label="فك الاقتران"><svg><use href="#i-trash"/></svg></button>
+              ? `<button class="btn small ghost" type="button" data-act="disconnect" data-mac="${esc(d.mac)}">${t("bt_disconnect")}</button>`
+              : `<button class="btn small" type="button" data-act="connect" data-mac="${esc(d.mac)}">${t("bt_connect")}</button>`}
+            <button class="t-btn del" type="button" data-act="remove" data-mac="${esc(d.mac)}" data-name="${esc(d.name)}" title="${t("bt_unpair")}" aria-label="${t("bt_unpair")}"><svg><use href="#i-trash"/></svg></button>
           </li>`).join("") + `</ul>`;
       }
       if (st.error) h += `<p class="bad-text small-text">${esc(st.error)}</p>`;
       if (full) {
-        h += `<label class="switch"><input type="checkbox" data-set="bt_takeover" ${st.takeover ? "checked" : ""}><span>لما التلفون يشغّل صوت، حوّل الراديو عليه لحاله</span></label>
-          <details class="bt-more" ${moreOpen ? "open" : ""}><summary class="muted">اسم الجهاز بالبلوتوث</summary>
-            <label class="field"><span>الاسم اللي بيطلع بالتلفون</span><input type="text" data-name-input maxlength="30" dir="auto" value="${esc(st.name)}"></label>
-            <button class="btn ghost small" type="button" data-act="save-name">حفظ الاسم</button>
+        h += `<label class="switch"><input type="checkbox" data-set="bt_takeover" ${st.takeover ? "checked" : ""}><span>${t("bt_takeover")}</span></label>
+          <details class="bt-more" ${moreOpen ? "open" : ""}><summary class="muted">${t("bt_name_h")}</summary>
+            <label class="field"><span>${t("bt_name_l")}</span><input type="text" data-name-input maxlength="30" dir="auto" value="${esc(st.name)}"></label>
+            <button class="btn ghost small" type="button" data-act="save-name">${t("bt_name_save")}</button>
           </details>`;
       }
       return h;
@@ -110,21 +107,21 @@
       const b = e.target.closest("[data-act]");
       if (!b || busy) return;
       const act = b.dataset.act, mac = b.dataset.mac;
-      if (act === "remove" && !window.confirm(`فك الاقتران مع «${b.dataset.name}»؟ لترجع توصله بدك تعمل اقتران من جديد.`)) return;
+      if (act === "remove" && !window.confirm(t("bt_unpair_q", { name: b.dataset.name }))) return;
       busy = true;
       b.disabled = true;
       try {
         if (act === "pair-on") await post("/api/bluetooth/pairing", { on: true });
         else if (act === "pair-off") await post("/api/bluetooth/pairing", { on: false });
-        else if (act === "connect") { await post("/api/bluetooth/connect", { mac }); toast("جاري الاتصال… خلي البلوتوث بالتلفون شغال", ""); }
+        else if (act === "connect") { await post("/api/bluetooth/connect", { mac }); toast(t("bt_connecting"), ""); }
         else if (act === "disconnect") await post("/api/bluetooth/disconnect", { mac });
-        else if (act === "remove") { await post("/api/bluetooth/remove", { mac }); toast("انفك الاقتران. احذفه كمان من قائمة البلوتوث بالتلفون", "ok"); }
+        else if (act === "remove") { await post("/api/bluetooth/remove", { mac }); toast(t("bt_unpaired"), "ok"); }
         else if (act === "install") await post("/api/bluetooth/install", {});
         else if (act === "save-name") {
           const v = box.querySelector("[data-name-input]").value.trim();
           await post("/api/settings", { bt_name: v });
           box.querySelector("[data-name-input]").blur();
-          toast("انحفظ الاسم. إذا ما تغيّر بالتلفون، افصل وارجع اتصل", "ok");
+          toast(t("bt_name_saved"), "ok");
         }
       } catch (err) { toast(err.message, "bad"); }
       finally { busy = false; b.disabled = false; load(); }

@@ -10,12 +10,14 @@ The Pi runs its own Wi-Fi hotspot and a web page for frequency, songs, voice cli
 signal check and in-place updates. Since 1.1.0 it is also a Bluetooth speaker (A2DP sink:
 whatever the phone plays goes out on FM), has push-to-talk from the phone's microphone,
 and a welcome page that pops up only once per phone.
+The web page is in English by default, with Arabic one tap away (Settings → Language).
 
 | Folder | What it is |
 |---|---|
 | `piradio/` | The product. Copy this folder to the SD card (`bootfs`) or clone the repo on the Pi, then run `sudo bash piradio/install.sh` |
 | `dev/` | Tests that run on a normal computer: a PiFmRds simulator (`pi_fm_rds_sim.c`), a fake BlueZ (`fake_busctl.py`), the end-to-end suite (`test_all.py`) and `make-update.sh` (builds `dist/piradio-update-<version>.tar.gz`) |
 | `دليل-التركيب.html` | Full Arabic install and usage guide |
+| `site/` | The landing page (English / Arabic), published with GitHub Pages from the `gh-pages` branch |
 
 Version: see `piradio/VERSION`. Each release has its own branch (`release/<version>`) and tag (`v<version>`).
 

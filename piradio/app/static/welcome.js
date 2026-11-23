@@ -1,6 +1,8 @@
 "use strict";
 /* Welcome page: shown by the phone's "sign in to Wi-Fi" pop-up the first time
    it joins the PiRadio Wi-Fi. "Done" remembers the phone so it does not pop up again. */
+const t = window.I18N.t;
+document.title = t("w_title");
 const $ = (s) => document.querySelector(s);
 
 let toastTimer;
@@ -43,8 +45,8 @@ async function copyText(text) {
   return ok;
 }
 async function copyURL() {
-  if (await copyText(url)) toast("انسخ الرابط ✓ الصقه بالمتصفح", "ok");
-  else toast("ما قدرت أنسخ. اكتبه بالمتصفح: " + url, "bad");
+  if (await copyText(url)) toast(t("w_copied"), "ok");
+  else toast(t("copy_fail", { url }), "bad");
 }
 $("#w-copy").addEventListener("click", copyURL);
 document.querySelector("[data-copy]").addEventListener("click", copyURL);
@@ -54,11 +56,11 @@ async function status() {
     const st = await fetch("/api/state", { cache: "no-store" }).then((r) => r.json());
     const tx = st.tx, air = $("#w-air");
     air.className = "air " + ({ on_air: "on", starting: "starting", error: "err" }[tx.status] || "off");
-    $("#w-air-text").textContent = tx.status === "on_air" ? `على الهواء FM ${fmtFreq(tx.frequency)}` : tx.status === "starting" ? "جاري تشغيل البث…" : tx.status === "error" ? "في مشكلة بالبث" : "البث متوقف";
+    $("#w-air-text").textContent = tx.status === "on_air" ? t("w_air", { f: fmtFreq(tx.frequency) }) : tx.status === "starting" ? t("air_starting") : tx.status === "error" ? t("air_error") : t("air_off");
     const p = st.player, live = p.live;
-    $("#w-now").textContent = live ? (live.kind === "bt" ? "🎧 عم يبث من البلوتوث: " + live.label : "🎙️ بث مباشر من المايك")
+    $("#w-now").textContent = live ? (live.kind === "bt" ? t("w_now_bt", { name: live.label }) : t("w_now_mic"))
       : p.state === "playing" && p.track ? "🎵 " + p.track.title
-      : `حط راديو السيارة على FM ${fmtFreq(tx.frequency)}`;
+      : t("w_tune", { f: fmtFreq(tx.frequency) });
   } catch (_) { /* retry */ }
   setTimeout(status, 3000);
 }
@@ -81,7 +83,7 @@ $("#w-done").addEventListener("click", async () => {
     setTimeout(() => location.replace("/welcome?done=1"), 1200);
   } catch (_) {
     b.disabled = false;
-    toast("ما زبط. جرّب مرة ثانية", "bad");
+    toast(t("w_retry"), "bad");
   }
 });
 

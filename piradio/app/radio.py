@@ -189,7 +189,7 @@ class RadioApp:
     def update_settings(self, values):
         allowed = {"station_name", "radiotext", "rds_song_text", "ps_scroll", "pi_code", "ppm",
                    "preemphasis", "transmit_on_boot", "autoplay", "bt_enabled", "bt_takeover",
-                   "bt_name", "captive_mode"}
+                   "bt_name", "captive_mode", "language"}
         values = {k: v for k, v in values.items() if k in allowed}
         changed = self.settings.update(**values)
         s = self.settings.all()
@@ -313,7 +313,8 @@ class RadioApp:
             "settings": {k: s[k] for k in (
                 "frequency", "station_name", "radiotext", "rds_song_text", "ps_scroll",
                 "pi_code", "ppm", "volume", "preemphasis", "transmit_on_boot", "autoplay",
-                "shuffle", "repeat", "bt_enabled", "bt_takeover", "bt_name", "captive_mode")},
+                "shuffle", "repeat", "bt_enabled", "bt_takeover", "bt_name", "captive_mode",
+                "language")},
             "rds": {"ps": self._ps_shown or s["station_name"], "rt": self.tx.params.get("rt", "")},
             "library": {"version": self.library.version, "count": len(self.library.ids()),
                         "scanning": self.library.scanning, "imported": self.imported},

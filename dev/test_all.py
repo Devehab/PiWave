@@ -360,7 +360,7 @@ def main():
     s = state()["player"]
     check("uploaded song is playing", s["state"] == "playing" and s["track"]["title"] == "أغنيتي الجديدة", s)
     code, j = api("POST", "/api/upload", files={"file": ("notes.mp3", b"hello world", "audio/mpeg")})
-    check("non-audio upload rejected with Arabic message", code == 400 and "صوت" in j["error"], j)
+    check("non-audio upload rejected with a clear message", code == 400 and "not an audio file" in j["error"], j)
     leftovers = [n for n in os.listdir(os.path.join(DATA, "music")) if n.startswith(".upload-")]
     check("no temp files left after uploads", leftovers == [], leftovers)
     # a voice recording as browsers produce it (webm/opus)
@@ -438,12 +438,28 @@ def main():
     st = wait_until(lambda: (lambda s: s if s["player"]["track"] and s["player"]["track"]["id"] == before else None)(state()), 25)
     check("after the tone the previous song resumes", st is not None, state()["player"])
 
+    print("== language")
+    page = requests.get(URL + "/", timeout=5).text
+    code, j = api("POST", "/api/frequency", json={"frequency": 150})
+    check("English by default (page and messages)", '<html lang="en" dir="ltr">' in page and "between 76.0 and 108.0 MHz" in j["error"], (page[:80], j))
+    code, j = api("POST", "/api/settings", json={"language": "ar"})
+    page = requests.get(URL + "/", timeout=5).text
+    welcome = requests.get(URL + "/welcome", timeout=5).text
+    code2, j2 = api("POST", "/api/frequency", json={"frequency": 150})
+    check("switch to Arabic: right-to-left page and Arabic messages",
+          code == 200 and '<html lang="ar" dir="rtl">' in page and '<html lang="ar" dir="rtl">' in welcome and "ميغاهيرتز" in j2["error"],
+          (code, page[:80], j2))
+    code, j = api("POST", "/api/settings", json={"language": "fr"})
+    check("unknown language refused", code == 400, j)
+    api("POST", "/api/settings", json={"language": "en"})
+    check("back to English", '<html lang="en" dir="ltr">' in requests.get(URL + "/", timeout=5).text, "")
+
     print("== welcome page (captive portal)")
     probe = lambda host, path: requests.get(URL + path, headers={"Host": host}, allow_redirects=False, timeout=5)
     r = probe("captive.apple.com", "/hotspot-detect.html")
     check("new phone is sent to the welcome page", r.status_code == 302 and r.headers.get("Location", "").endswith("/welcome"), (r.status_code, r.headers.get("Location")))
     r = requests.get(URL + "/welcome", timeout=5)
-    check("welcome page loads", r.status_code == 200 and "تم، فهمت" in r.text, r.status_code)
+    check("welcome page loads", r.status_code == 200 and "Done, got it" in r.text, r.status_code)
     code, j = api("POST", "/api/captive/ack")
     r1 = probe("captive.apple.com", "/hotspot-detect.html")
     r2 = probe("connectivitycheck.gstatic.com", "/generate_204")
@@ -489,7 +505,7 @@ def main():
             code_busy, j_busy = api("POST", "/api/player/next", json={})
         time.sleep(max(0, t0 + (i + step) / 88200.0 - time.time()))
     check("voice is on air, the song waits", mid["player"]["live"] and mid["player"]["live"]["kind"] == "ptt" and mid["player"]["state"] == "paused", mid["player"])
-    check("song buttons wait while someone talks", code_busy == 400 and "يحكي" in j_busy.get("error", ""), (code_busy, j_busy))
+    check("song buttons wait while someone talks", code_busy == 400 and "talking" in j_busy.get("error", ""), (code_busy, j_busy))
     check("car display says LIVE while talking", wait_until(lambda: 'RT set to: "LIVE - ' in log_text()[mark:], 3), "")
     check("microphone audio reaches the transmitter", any("audio=1" in l for l in sim_lines(mark)), sim_lines(mark)[-3:])
     api("POST", "/api/ptt/%s/end" % sid, json={})
@@ -585,7 +601,7 @@ def main():
         with open(os.path.join(root, "app", "server.py"), "a") as f:
             f.write("\ndef broken(:\n")
     code, j = upload_update(build_package(ver(2), mutate=syntax_error))
-    check("update with broken code is refused, nothing changes", code == 400 and "خطأ" in j["error"] and state()["version"] == ver(1), j)
+    check("update with broken code is refused, nothing changes", code == 400 and "error" in j["error"] and state()["version"] == ver(1), j)
     code, j = upload_update(build_package(ver(2), tamper=True))
     check("tampered/corrupt update refused", code == 400 and "rdstext.py" in j["error"], j)
     junk = os.path.join(WORK, "junk.tar.gz")

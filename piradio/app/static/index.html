@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f1115">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>راديو السيارة</title>
+<title>Car Radio · PiRadio</title>
 <link rel="stylesheet" href="/static/style.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23f5a524'/%3E%3Cpath d='M6 9h12v9H6z' fill='%230f1115'/%3E%3Ccircle cx='10' cy='13.5' r='2' fill='%23f5a524'/%3E%3Cpath d='M7 8l9-4' stroke='%230f1115' stroke-width='1.6'/%3E%3C/svg%3E">
 </head>
@@ -34,7 +34,7 @@
 </svg>
 
 <header class="top">
-  <div class="brand"><svg><use href="#i-radio"/></svg><span>راديو السيارة</span></div>
+  <div class="brand"><svg><use href="#i-radio"/></svg><span data-i18n="app_title">Car Radio</span></div>
   <div id="air" class="air off" role="status"><i></i><span id="air-text">…</span></div>
 </header>
 
@@ -43,19 +43,19 @@
 <section id="tab-radio" class="tab active">
   <div class="card dial">
     <div class="dial-top">
-      <span class="muted">التردد</span>
+      <span class="muted" data-i18n="freq_label">Frequency</span>
       <button id="tx-toggle" class="pill-btn" type="button"><svg><use href="#i-power"/></svg><span>…</span></button>
     </div>
     <div class="freq" dir="ltr"><span id="freq-num">---.-</span><small>MHz FM</small></div>
     <div id="freq-pending" class="pending hidden">
-      <span>التردد الجديد: <b dir="ltr" id="freq-draft"></b></span>
-      <button id="freq-apply" class="btn primary small" type="button">تطبيق</button>
-      <button id="freq-cancel" class="btn ghost small" type="button">إلغاء</button>
+      <span><span data-i18n="freq_new">New frequency:</span> <b dir="ltr" id="freq-draft"></b></span>
+      <button id="freq-apply" class="btn primary small" type="button" data-i18n="apply">Apply</button>
+      <button id="freq-cancel" class="btn ghost small" type="button" data-i18n="cancel">Cancel</button>
     </div>
     <div class="stepper" dir="ltr">
       <button type="button" data-step="-1">−1</button>
       <button type="button" data-step="-0.1">−0.1</button>
-      <input id="freq-input" type="number" inputmode="decimal" step="0.1" min="76" max="108" aria-label="التردد">
+      <input id="freq-input" type="number" inputmode="decimal" step="0.1" min="76" max="108" aria-label="Frequency" data-i18n-aria="freq_aria">
       <button type="button" data-step="0.1">+0.1</button>
       <button type="button" data-step="1">+1</button>
     </div>
@@ -69,49 +69,49 @@
         <div class="live-title" id="live-title"></div>
         <div class="muted live-sub" id="live-sub"></div>
       </div>
-      <span class="live-badge hidden" id="live-badge">على الهوا</span>
+      <span class="live-badge hidden" id="live-badge" data-i18n="on_air">On air</span>
     </div>
     <div class="controls bt-ctl hidden" dir="ltr" id="bt-ctl">
-      <button class="icon-btn" type="button" data-btmedia="prev" title="السابقة بالتلفون"><svg><use href="#i-prev"/></svg></button>
-      <button class="icon-btn big" type="button" data-btmedia="toggle" title="تشغيل/إيقاف بالتلفون"><svg><use href="#i-play"/></svg></button>
-      <button class="icon-btn" type="button" data-btmedia="next" title="التالية بالتلفون"><svg><use href="#i-next"/></svg></button>
+      <button class="icon-btn" type="button" data-btmedia="prev" data-i18n-title="bt_prev"><svg><use href="#i-prev"/></svg></button>
+      <button class="icon-btn big" type="button" data-btmedia="toggle" data-i18n-title="bt_toggle"><svg><use href="#i-play"/></svg></button>
+      <button class="icon-btn" type="button" data-btmedia="next" data-i18n-title="bt_next"><svg><use href="#i-next"/></svg></button>
     </div>
-    <button class="btn ghost block hidden" id="live-back" type="button"><svg><use href="#i-music"/></svg> رجّع أغاني الجهاز</button>
+    <button class="btn ghost block hidden" id="live-back" type="button"><svg><use href="#i-music"/></svg> <span data-i18n="live_back">Back to the Pi's songs</span></button>
   </div>
 
   <div class="card now">
     <div class="now-head">
       <div class="art" id="art"><svg><use href="#i-music"/></svg><div class="eq"><i></i><i></i><i></i><i></i></div></div>
       <div class="now-text">
-        <div class="now-title" id="now-title">ما في شي شغال</div>
-        <div class="now-artist muted" id="now-artist">ارفع أغاني من تبويب «الأغاني»</div>
+        <div class="now-title" id="now-title" data-i18n="now_none">Nothing playing</div>
+        <div class="now-artist muted" id="now-artist" data-i18n="now_upload">Upload songs from the «Songs» tab</div>
       </div>
     </div>
     <div class="seek" dir="ltr">
-      <input id="seek" type="range" min="0" max="100" step="0.5" value="0" aria-label="مكان الأغنية">
+      <input id="seek" type="range" min="0" max="100" step="0.5" value="0" data-i18n-aria="seek_aria">
       <div class="times" dir="ltr"><span id="t-pos">0:00</span><span id="t-dur">0:00</span></div>
     </div>
     <div class="controls" dir="ltr">
-      <button id="b-shuffle" class="icon-btn" type="button" title="عشوائي"><svg><use href="#i-shuffle"/></svg></button>
-      <button id="b-prev" class="icon-btn" type="button" title="السابقة"><svg><use href="#i-prev"/></svg></button>
-      <button id="b-play" class="play-btn" type="button" title="تشغيل"><svg><use href="#i-play"/></svg></button>
-      <button id="b-next" class="icon-btn" type="button" title="التالية"><svg><use href="#i-next"/></svg></button>
-      <button id="b-repeat" class="icon-btn" type="button" title="تكرار"><svg><use href="#i-repeat"/></svg><b id="repeat-one" class="hidden">1</b></button>
+      <button id="b-shuffle" class="icon-btn" type="button" data-i18n-title="shuffle"><svg><use href="#i-shuffle"/></svg></button>
+      <button id="b-prev" class="icon-btn" type="button" data-i18n-title="prev"><svg><use href="#i-prev"/></svg></button>
+      <button id="b-play" class="play-btn" type="button" data-i18n-title="play"><svg><use href="#i-play"/></svg></button>
+      <button id="b-next" class="icon-btn" type="button" data-i18n-title="next"><svg><use href="#i-next"/></svg></button>
+      <button id="b-repeat" class="icon-btn" type="button" data-i18n-title="repeat"><svg><use href="#i-repeat"/></svg><b id="repeat-one" class="hidden">1</b></button>
     </div>
     <div class="vol" dir="ltr">
       <svg><use href="#i-vol"/></svg>
-      <input id="volume" type="range" min="0" max="100" step="5" aria-label="الصوت">
+      <input id="volume" type="range" min="0" max="100" step="5" data-i18n-aria="volume">
       <span id="vol-val" dir="ltr">100%</span>
     </div>
-    <div class="meter" dir="ltr" title="مستوى الصوت الداخل على المرسل"><i id="meter"></i></div>
+    <div class="meter" dir="ltr" data-i18n-title="meter_title"><i id="meter"></i></div>
     <div id="player-error" class="err hidden"></div>
   </div>
 
   <div class="quick">
-    <button id="q-talk" class="card quick-btn" type="button"><svg><use href="#i-talk"/></svg><span>احكي مباشر<small>زي اللاسلكي</small></span></button>
-    <button id="q-bt" class="card quick-btn" type="button"><svg><use href="#i-bt"/></svg><span>بلوتوث<small id="q-bt-sub">وصّل تلفونك</small></span></button>
-    <button id="q-record" class="card quick-btn" type="button"><svg><use href="#i-mic"/></svg><span>سجّل صوتك<small>وابعثه على الراديو</small></span></button>
-    <button id="q-tone" class="card quick-btn" type="button"><svg><use href="#i-bell"/></svg><span>نغمة اختبار<small>تأكد إنك سامع</small></span></button>
+    <button id="q-talk" class="card quick-btn" type="button"><svg><use href="#i-talk"/></svg><span><span data-i18n="q_talk">Talk live</span><small data-i18n="q_talk_sub">like a walkie-talkie</small></span></button>
+    <button id="q-bt" class="card quick-btn" type="button"><svg><use href="#i-bt"/></svg><span><span data-i18n="q_bt">Bluetooth</span><small id="q-bt-sub" data-i18n="q_bt_sub">Connect your phone</small></span></button>
+    <button id="q-record" class="card quick-btn" type="button"><svg><use href="#i-mic"/></svg><span><span data-i18n="q_rec">Record your voice</span><small data-i18n="q_rec_sub">and send it on air</small></span></button>
+    <button id="q-tone" class="card quick-btn" type="button"><svg><use href="#i-bell"/></svg><span><span data-i18n="q_tone">Test tone</span><small data-i18n="q_tone_sub">Make sure you can hear it</small></span></button>
   </div>
 </section>
 
@@ -119,21 +119,21 @@
 <section id="tab-songs" class="tab">
   <div class="card">
     <label class="btn primary block upload-btn">
-      <svg><use href="#i-upload"/></svg> ارفع أغاني من الموبايل
+      <svg><use href="#i-upload"/></svg> <span data-i18n="upload_btn">Upload songs from your phone</span>
       <input id="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus" multiple hidden>
     </label>
-    <p class="muted small-text">MP3، M4A، WAV، FLAC، OGG… تقدر تختار أكثر من ملف. ولو زر الرفع ما فتح الملفات، افتح هالصفحة بمتصفح سفاري أو كروم على <b dir="ltr">http://192.168.4.1</b>.</p>
+    <p class="muted small-text" data-i18n="upload_help"></p>
     <div id="uploads"></div>
   </div>
   <div class="card list-card">
     <div class="list-head">
-      <b>المكتبة <span class="muted" id="lib-count"></span></b>
-      <input id="search" type="search" placeholder="بحث…" aria-label="بحث">
+      <b><span data-i18n="library">Library</span> <span class="muted" id="lib-count"></span></b>
+      <input id="search" type="search" data-i18n-ph="search" data-i18n-aria="search">
     </div>
     <ul id="tracks" class="tracks"></ul>
     <div id="lib-empty" class="empty hidden">
       <svg><use href="#i-music"/></svg>
-      <p>المكتبة فاضية.<br>ارفع أغاني من فوق، أو انسخها على الكرت بمجلد <b dir="ltr">piradio-music</b>.</p>
+      <p data-i18n="lib_empty"></p>
     </div>
     <ul id="bad-tracks" class="tracks bad"></ul>
   </div>
@@ -142,37 +142,37 @@
 <!-- ============================ CHECK ============================ -->
 <section id="tab-check" class="tab">
   <div class="card">
-    <h2>هل البث شغال؟</h2>
+    <h2 data-i18n="check_title">Is it broadcasting?</h2>
     <ul class="checks" id="checks"></ul>
     <div class="meter big" dir="ltr"><i id="meter2"></i></div>
-    <p class="muted small-text">العدّاد بيتحرك لما يكون في صوت داخل على المرسل.</p>
-    <button id="c-tone" class="btn primary block" type="button"><svg><use href="#i-bell"/></svg> شغّل نغمة اختبار 20 ثانية</button>
-    <details class="txlog"><summary>رسائل برنامج البث</summary><pre id="txlog" dir="ltr"></pre></details>
+    <p class="muted small-text" data-i18n="meter_hint"></p>
+    <button id="c-tone" class="btn primary block" type="button"><svg><use href="#i-bell"/></svg> <span data-i18n="c_tone">Play a 20-second test tone</span></button>
+    <details class="txlog"><summary data-i18n="txlog">Transmitter messages</summary><pre id="txlog" dir="ltr"></pre></details>
   </div>
 
   <div class="card">
-    <h2>بالسيارة: كيف تسمع</h2>
+    <h2 data-i18n="car_title">In the car: how to listen</h2>
     <ol class="steps" id="car-steps"></ol>
   </div>
 
   <div class="card">
-    <h2>السلك والمدى على <span dir="ltr" class="accent" id="ant-freq"></span></h2>
-    <p class="muted small-text">بين 88 و 108 ميغاهيرتز، تغيير التردد تقريباً ما بيغيّر المدى. اللي بيفرق هو <b>طول السلك</b>.</p>
+    <h2><span data-i18n="ant_title">Wire and range on</span> <span dir="ltr" class="accent" id="ant-freq"></span></h2>
+    <p class="muted small-text" data-i18n="ant_intro"></p>
     <table class="ant">
-      <thead><tr><th>طول السلك</th><th>المدى التقريبي</th><th></th></tr></thead>
+      <thead><tr><th data-i18n="th_wire">Wire length</th><th data-i18n="th_range">Approx. range</th><th></th></tr></thead>
       <tbody id="ant-rows"></tbody>
     </table>
     <p class="muted small-text" id="ant-note"></p>
   </div>
 
   <div class="card">
-    <h2>وين أوصل السلك؟</h2>
+    <h2 data-i18n="wire_title">Where does the wire go?</h2>
     <div class="pinout" id="pinout"></div>
     <ul class="bullets">
-      <li>السلك على <b>الرجل رقم 7</b> (GPIO4) <b>بس</b>، وطرفه التاني حر بالهوا.</li>
-      <li>الرجل رقم 7 هي <b>الرابعة</b> بالصف الداخلي، من جهة كرت الذاكرة.</li>
-      <li><b class="bad-text">لا</b> تلمس الرجل 2 و 4 (5V) ولا 6 و 9 (GND): ممكن تحرق اللوحة.</li>
-      <li>الكهربا على منفذ <b>PWR IN</b> (الطرفي)، مش منفذ USB اللي بالنص.</li>
+      <li data-i18n="wire_1"></li>
+      <li data-i18n="wire_2"></li>
+      <li data-i18n="wire_3"></li>
+      <li data-i18n="wire_4"></li>
     </ul>
   </div>
 </section>
@@ -180,129 +180,137 @@
 <!-- ============================ SETTINGS ============================ -->
 <section id="tab-settings" class="tab">
   <div class="card">
-    <h2>شاشة راديو السيارة (RDS)</h2>
-    <label class="field"><span>اسم المحطة (8 أحرف إنجليزي)</span>
-      <input id="s-ps" maxlength="8" dir="ltr" autocomplete="off"></label>
-    <label class="switch"><input type="checkbox" id="s-rt"><span>اعرض اسم الأغنية كنص (RadioText)</span></label>
-    <label class="switch"><input type="checkbox" id="s-scroll"><span>اعرض اسم الأغنية مكان اسم المحطة (لو راديوك ما بعرض النص)</span></label>
-    <label class="field"><span>النص لما ما في أغنية</span><input id="s-radiotext" maxlength="64" dir="ltr"></label>
-    <p class="muted small-text">شاشة الراديو ما بتعرض حروف عربية، فالأسماء العربية بتطلع بالعربيزي (مثل 3mr Diab).</p>
-    <button id="s-save-rds" class="btn primary" type="button">حفظ</button>
-  </div>
-
-  <div class="card">
-    <h2>الصوت والتشغيل</h2>
-    <label class="field"><span>Pre-emphasis</span>
-      <select id="s-pre">
-        <option value="50">50µs: الشرق الأوسط وأوروبا (الافتراضي)</option>
-        <option value="75">75µs: سيارات أمريكية</option>
-        <option value="off">بدون</option>
-      </select></label>
-    <label class="switch"><input type="checkbox" id="s-txboot"><span>ابدأ البث أول ما يشتغل الجهاز</span></label>
-    <label class="switch"><input type="checkbox" id="s-autoplay"><span>كمّل آخر أغنية أول ما يشتغل الجهاز</span></label>
-    <details><summary class="muted">إعدادات متقدمة</summary>
-      <label class="field"><span>رمز PI</span><input id="s-pi" maxlength="4" dir="ltr"></label>
-      <label class="field"><span>تصحيح الكريستال (ppm)</span><input id="s-ppm" type="number" step="1" dir="ltr"></label>
-    </details>
-    <button id="s-save-audio" class="btn primary" type="button">حفظ</button>
-  </div>
-
-  <div class="card">
-    <h2>البلوتوث</h2>
-    <p class="muted small-text">الجهاز بيطلع بتلفونك كسماعة اسمها <b id="s-bt-name-show">PiRadio</b>. أي صوت بتشغله بالتلفون بيطلع على راديو السيارة.</p>
-    <button id="s-bt-open" class="btn primary block" type="button"><svg><use href="#i-bt"/></svg> إدارة البلوتوث والاقتران</button>
-  </div>
-
-  <div class="card">
-    <h2>فتح الصفحة</h2>
-    <div class="url-box"><b dir="ltr" class="url" id="u-url">http://192.168.4.1</b><button id="u-copy" class="btn small" type="button"><svg><use href="#i-copy"/></svg> نسخ الرابط</button></div>
-    <p class="muted small-text">افتح الرابط بأي متصفح وإنت متصل بشبكة الراديو. نصيحة: بسفاري اضغط مشاركة ← «إضافة إلى الشاشة الرئيسية»، وبكروم ⋮ ← «إضافة إلى الشاشة الرئيسية»، وبتصير تفتحها بكبسة.</p>
-    <label class="field"><span>صفحة الترحيب اللي بتطلع لما تتصل بالواي فاي</span>
-      <select id="s-captive">
-        <option value="once">مرة وحدة لكل تلفون (بعد «تم» ما بترجع)</option>
-        <option value="always">كل مرة (نت الموبايل بيضل شغال)</option>
-      </select></label>
-    <details><summary class="muted">شو الفرق؟</summary>
-      <p class="small-text">«مرة وحدة»: بعد ما تضغط «تم» بصفحة الترحيب، التلفون بيعتبر شبكة الراديو «متصلة»، فالصفحة ما بتطلع مرة ثانية وبتقدر تفتح الرابط بالمتصفح بسهولة. بس طول ما التلفون متصل بالشبكة، تطبيقات النت (الخرائط، سبوتيفاي) ممكن ما تشتغل، لأنه الراديو مش متصل بالإنترنت. إذا بدك نت، افصل الواي فاي (البلوتوث بيضل شغال).</p>
-      <p class="small-text">«كل مرة»: الصفحة بتطلع كل ما تتصل، والتلفون بيضل يستعمل بيانات الموبايل للنت.</p>
-    </details>
-    <div class="row">
-      <a class="btn ghost" href="/welcome">اعرض صفحة الترحيب</a>
-      <button id="u-reset" class="btn ghost" type="button">رجّعها لكل التلفونات</button>
+    <h2 data-i18n="lang_title">Language</h2>
+    <div class="seg" role="radiogroup" data-i18n-aria="lang_label">
+      <button type="button" data-lang="en" role="radio" lang="en">English</button>
+      <button type="button" data-lang="ar" role="radio" lang="ar">العربية</button>
     </div>
   </div>
 
   <div class="card">
-    <h2>شبكة الواي فاي</h2>
-    <label class="field"><span>اسم الشبكة</span><input id="w-ssid" dir="ltr" maxlength="32" autocomplete="off"></label>
-    <label class="field"><span>كلمة السر (8 أحرف على الأقل)</span><input id="w-pass" dir="ltr" maxlength="63" autocomplete="off"></label>
-    <button id="w-save" class="btn primary" type="button">حفظ وإعادة تشغيل الشبكة</button>
-    <p class="muted small-text">بعد الحفظ موبايلك رح ينفصل. اتصل بالشبكة الجديدة.</p>
-    <button id="w-home" class="btn ghost block" type="button">اتصل بواي فاي البيت لحد إعادة التشغيل</button>
+    <h2 data-i18n="rds_title">Car radio display (RDS)</h2>
+    <label class="field"><span data-i18n="s_ps">Station name (8 English characters)</span>
+      <input id="s-ps" maxlength="8" dir="ltr" autocomplete="off"></label>
+    <label class="switch"><input type="checkbox" id="s-rt"><span data-i18n="s_rt"></span></label>
+    <label class="switch"><input type="checkbox" id="s-scroll"><span data-i18n="s_scroll"></span></label>
+    <label class="field"><span data-i18n="s_radiotext">Text when no song is playing</span><input id="s-radiotext" maxlength="64" dir="ltr"></label>
+    <p class="muted small-text" data-i18n="rds_note"></p>
+    <button id="s-save-rds" class="btn primary" type="button" data-i18n="save">Save</button>
   </div>
 
   <div class="card">
-    <h2>التحديث</h2>
+    <h2 data-i18n="audio_title">Sound and playback</h2>
+    <label class="field"><span>Pre-emphasis</span>
+      <select id="s-pre">
+        <option value="50" data-i18n="pre_50"></option>
+        <option value="75" data-i18n="pre_75"></option>
+        <option value="off" data-i18n="pre_off"></option>
+      </select></label>
+    <label class="switch"><input type="checkbox" id="s-txboot"><span data-i18n="s_txboot"></span></label>
+    <label class="switch"><input type="checkbox" id="s-autoplay"><span data-i18n="s_autoplay"></span></label>
+    <details><summary class="muted" data-i18n="advanced">Advanced settings</summary>
+      <label class="field"><span data-i18n="s_pi">PI code</span><input id="s-pi" maxlength="4" dir="ltr"></label>
+      <label class="field"><span data-i18n="s_ppm">Crystal correction (ppm)</span><input id="s-ppm" type="number" step="1" dir="ltr"></label>
+    </details>
+    <button id="s-save-audio" class="btn primary" type="button" data-i18n="save">Save</button>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="bt_title">Bluetooth</h2>
+    <p class="muted small-text"><span data-i18n="bt_desc1"></span> <b id="s-bt-name-show" dir="auto">PiRadio</b><span data-i18n="bt_desc2"></span></p>
+    <button id="s-bt-open" class="btn primary block" type="button"><svg><use href="#i-bt"/></svg> <span data-i18n="bt_manage">Manage Bluetooth and pairing</span></button>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="link_title">Open the page</h2>
+    <div class="url-box"><b dir="ltr" class="url" id="u-url">http://192.168.4.1</b><button id="u-copy" class="btn small" type="button"><svg><use href="#i-copy"/></svg> <span data-i18n="copy_link">Copy link</span></button></div>
+    <p class="muted small-text" data-i18n="link_help"></p>
+    <label class="field"><span data-i18n="captive_label">Welcome page shown when you join the Wi-Fi</span>
+      <select id="s-captive">
+        <option value="once" data-i18n="captive_once"></option>
+        <option value="always" data-i18n="captive_always"></option>
+      </select></label>
+    <details><summary class="muted" data-i18n="captive_diff">What's the difference?</summary>
+      <p class="small-text" data-i18n="captive_once_help"></p>
+      <p class="small-text" data-i18n="captive_always_help"></p>
+    </details>
+    <div class="row">
+      <a class="btn ghost" href="/welcome" data-i18n="show_welcome">Show the welcome page</a>
+      <button id="u-reset" class="btn ghost" type="button" data-i18n="reset_welcome">Show it to all phones again</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="wifi_title">Wi-Fi network</h2>
+    <label class="field"><span data-i18n="w_ssid">Network name</span><input id="w-ssid" dir="ltr" maxlength="32" autocomplete="off"></label>
+    <label class="field"><span data-i18n="w_pass">Password (at least 8 characters)</span><input id="w-pass" dir="ltr" maxlength="63" autocomplete="off"></label>
+    <button id="w-save" class="btn primary" type="button" data-i18n="w_save">Save and restart the network</button>
+    <p class="muted small-text" data-i18n="w_note"></p>
+    <button id="w-home" class="btn ghost block" type="button" data-i18n="w_home">Join home Wi-Fi until the next restart</button>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="upd_title">Update</h2>
     <div class="version-row">
-      <div><span class="muted">الإصدار الحالي</span><b id="v-cur" dir="ltr">…</b></div>
-      <div><span class="muted">الإصدار السابق</span><b id="v-prev" dir="ltr">—</b></div>
+      <div><span class="muted" data-i18n="v_cur">Current version</span><b id="v-cur" dir="ltr">…</b></div>
+      <div><span class="muted" data-i18n="v_prev">Previous version</span><b id="v-prev" dir="ltr">—</b></div>
     </div>
     <div id="v-result" class="note hidden"></div>
     <label class="btn primary block upload-btn">
-      <svg><use href="#i-upload"/></svg> ارفع ملف التحديث
+      <svg><use href="#i-upload"/></svg> <span data-i18n="upd_btn">Upload update file</span>
       <input id="update-input" type="file" accept=".gz,.tgz,.zip,application/gzip,application/zip" hidden>
     </label>
     <div id="update-progress" class="hidden"><div class="bar"><i></i></div><p class="muted small-text" id="update-text"></p><pre id="update-log" dir="ltr" class="hidden"></pre></div>
-    <p class="muted small-text">الملف اسمه مثل <b dir="ltr">piradio-update-1.0.1.tar.gz</b>. الجهاز بيفحصه قبل ما يثبّته، وإذا النسخة الجديدة ما اشتغلت، بيرجع للقديمة لحاله.</p>
+    <p class="muted small-text" data-i18n="upd_note"></p>
     <div class="row">
-      <button id="v-rollback" class="btn ghost" type="button">ارجع للإصدار السابق</button>
-      <a id="v-logs" class="btn ghost" href="/api/logs" download>تنزيل سجل الأخطاء</a>
+      <button id="v-rollback" class="btn ghost" type="button" data-i18n="v_rollback">Go back to the previous version</button>
+      <a id="v-logs" class="btn ghost" href="/api/logs" download data-i18n="v_logs">Download error log</a>
     </div>
   </div>
 
   <div class="card">
-    <h2>الجهاز</h2>
+    <h2 data-i18n="dev_title">Device</h2>
     <ul class="kv" id="sys"></ul>
     <div class="row">
-      <button id="p-reboot" class="btn ghost" type="button">إعادة تشغيل</button>
-      <button id="p-off" class="btn danger" type="button">إطفاء آمن</button>
+      <button id="p-reboot" class="btn ghost" type="button" data-i18n="p_reboot">Restart</button>
+      <button id="p-off" class="btn danger" type="button" data-i18n="p_off">Safe shutdown</button>
     </div>
-    <p class="muted small-text">قبل ما تفصل الكهربا، الأفضل تعمل «إطفاء آمن» وتستنى 20 ثانية، عشان ما يخرب كرت الذاكرة.</p>
+    <p class="muted small-text" data-i18n="off_note"></p>
   </div>
 </section>
 </main>
 
 <nav class="tabs">
-  <button data-tab="radio" class="active" type="button"><svg><use href="#i-radio"/></svg>الراديو</button>
-  <button data-tab="songs" type="button"><svg><use href="#i-music"/></svg>الأغاني</button>
-  <button data-tab="check" type="button"><svg><use href="#i-pulse"/></svg>الفحص</button>
-  <button data-tab="settings" type="button"><svg><use href="#i-gear"/></svg>الإعدادات</button>
+  <button data-tab="radio" class="active" type="button"><svg><use href="#i-radio"/></svg><span data-i18n="tab_radio">Radio</span></button>
+  <button data-tab="songs" type="button"><svg><use href="#i-music"/></svg><span data-i18n="tab_songs">Songs</span></button>
+  <button data-tab="check" type="button"><svg><use href="#i-pulse"/></svg><span data-i18n="tab_check">Check</span></button>
+  <button data-tab="settings" type="button"><svg><use href="#i-gear"/></svg><span data-i18n="tab_settings">Settings</span></button>
 </nav>
 
 <!-- ============================ RECORD SHEET ============================ -->
 <div id="rec" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="rec-title">
   <div class="sheet-body card">
-    <div class="sheet-head"><h2 id="rec-title">سجّل وابعث على الراديو</h2><button class="x" id="rec-close" type="button" aria-label="إغلاق">✕</button></div>
+    <div class="sheet-head"><h2 id="rec-title" data-i18n="rec_title">Record and send on air</h2><button class="x" id="rec-close" type="button" data-i18n-aria="close">✕</button></div>
     <div id="rec-ok">
       <div class="rec-timer" dir="ltr" id="rec-time">00:00</div>
       <div class="rec-wave"><i id="rec-level"></i></div>
-      <button id="rec-btn" class="rec-btn" type="button" aria-label="تسجيل"><span></span></button>
-      <p class="muted center" id="rec-hint">اضغط الزر الأحمر وابدأ احكي</p>
+      <button id="rec-btn" class="rec-btn" type="button" data-i18n-aria="rec_title"><span></span></button>
+      <p class="muted center" id="rec-hint" data-i18n="rec_hint"></p>
       <div id="rec-done" class="hidden">
         <audio id="rec-audio" controls></audio>
-        <label class="field"><span>اسم التسجيل</span><input id="rec-name"></label>
-        <button id="rec-send" class="btn primary block" type="button">📡 ابعثه على الراديو هلأ</button>
-        <label class="switch"><input type="checkbox" id="rec-loop"><span>كرّره بشكل متواصل</span></label>
-        <button id="rec-save" class="btn ghost block" type="button">احفظه بالمكتبة بس</button>
+        <label class="field"><span data-i18n="rec_name">Recording name</span><input id="rec-name" dir="auto"></label>
+        <button id="rec-send" class="btn primary block" type="button" data-i18n="rec_send">📡 Send it on air now</button>
+        <label class="switch"><input type="checkbox" id="rec-loop"><span data-i18n="rec_loop"></span></label>
+        <button id="rec-save" class="btn ghost block" type="button" data-i18n="rec_save">Just save it to the library</button>
       </div>
     </div>
     <div id="rec-insecure" class="hidden">
-      <p>المتصفح بيسمح بالمايكروفون بس على <b>الرابط الآمن</b> للجهاز.</p>
-      <a id="rec-https" class="btn primary block" href="#">افتح الرابط الآمن</a>
-      <p class="muted small-text">رح يطلعلك تحذير إنه «الاتصال مش خاص». هاد طبيعي لأنه الجهاز تبعك ومش موقع على الإنترنت. اختار <b>Show Details ← visit this website</b> بالآيفون، أو <b>Advanced ← Proceed</b> بالأندرويد.</p>
+      <p data-i18n="insecure"></p>
+      <a id="rec-https" class="btn primary block" href="#" data-i18n="open_secure">Open the secure link</a>
+      <p class="muted small-text" data-i18n="insecure_warn"></p>
       <hr>
-      <p>أو سجّل بتطبيق التسجيل اللي على موبايلك وارفع الملف:</p>
-      <label class="btn ghost block upload-btn">🎙️ سجّل بتطبيق الموبايل / اختار تسجيل
+      <p data-i18n="or_app"></p>
+      <label class="btn ghost block upload-btn"><span data-i18n="rec_capture"></span>
         <input id="rec-capture" type="file" accept="audio/*" capture hidden></label>
     </div>
   </div>
@@ -311,7 +319,7 @@
 <!-- ============================ BLUETOOTH SHEET ============================ -->
 <div id="bt-sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="bt-title">
   <div class="sheet-body card">
-    <div class="sheet-head"><h2 id="bt-title">البلوتوث</h2><button class="x" id="bt-close" type="button" aria-label="إغلاق">✕</button></div>
+    <div class="sheet-head"><h2 id="bt-title" data-i18n="bt_title">Bluetooth</h2><button class="x" id="bt-close" type="button" data-i18n-aria="close">✕</button></div>
     <div id="bt-box" class="bt-box"><p class="muted">…</p></div>
   </div>
 </div>
@@ -319,25 +327,26 @@
 <!-- ============================ PUSH-TO-TALK SHEET ============================ -->
 <div id="ptt" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="ptt-title">
   <div class="sheet-body card">
-    <div class="sheet-head"><h2 id="ptt-title">احكي مباشر على الراديو</h2><button class="x" id="ptt-close" type="button" aria-label="إغلاق">✕</button></div>
+    <div class="sheet-head"><h2 id="ptt-title" data-i18n="ptt_title">Talk live on the radio</h2><button class="x" id="ptt-close" type="button" data-i18n-aria="close">✕</button></div>
     <div id="ptt-ok">
-      <div class="ptt-status" id="ptt-status"><span class="dot-live"></span><b id="ptt-state">جاهز</b><span dir="ltr" class="muted" id="ptt-time"></span></div>
+      <div class="ptt-status" id="ptt-status"><span class="dot-live"></span><b id="ptt-state" data-i18n="ptt_ready">Ready</b><span dir="ltr" class="muted" id="ptt-time"></span></div>
       <div class="rec-wave"><i id="ptt-level"></i></div>
-      <button id="ptt-btn" class="ptt-btn" type="button"><svg><use href="#i-mic"/></svg><span id="ptt-label">اضغط مطوّل واحكي</span></button>
-      <label class="switch"><input type="checkbox" id="ptt-latch"><span>بدون ما أضل ضاغط: كبسة بتبدأ وكبسة بتوقف</span></label>
-      <p class="muted small-text">صوتك بيطلع على الراديو بعد أقل من ثانية، والأغنية بتوقف وبترجع لحالها لما تخلص. إذا سمعت صدى، وطّي صوت السيارة شوي.</p>
+      <button id="ptt-btn" class="ptt-btn" type="button"><svg><use href="#i-mic"/></svg><span id="ptt-label" data-i18n="ptt_hold">Press and hold to talk</span></button>
+      <label class="switch"><input type="checkbox" id="ptt-latch"><span data-i18n="ptt_latch"></span></label>
+      <p class="muted small-text" data-i18n="ptt_help"></p>
     </div>
     <div id="ptt-insecure" class="hidden">
-      <p>المتصفح بيسمح بالمايكروفون بس على <b>الرابط الآمن</b> للجهاز.</p>
-      <a id="ptt-https" class="btn primary block" href="#">افتح الرابط الآمن</a>
-      <p class="muted small-text">رح يطلعلك تحذير إنه «الاتصال مش خاص». هاد طبيعي لأنه الجهاز تبعك ومش موقع على الإنترنت. اختار <b>Show Details ← visit this website</b> بالآيفون، أو <b>Advanced ← Proceed</b> بالأندرويد.</p>
+      <p data-i18n="insecure"></p>
+      <a id="ptt-https" class="btn primary block" href="#" data-i18n="open_secure">Open the secure link</a>
+      <p class="muted small-text" data-i18n="insecure_warn"></p>
     </div>
-    <div id="ptt-old" class="hidden"><p>المتصفح هاد ما بيدعم البث المباشر من المايك. حدّث المتصفح، أو استعمل «سجّل صوتك» بدالها.</p></div>
+    <div id="ptt-old" class="hidden"><p data-i18n="ptt_old"></p></div>
   </div>
 </div>
 
 <div id="overlay" class="overlay hidden"><div class="spinner"></div><p id="overlay-text"></p></div>
 <div id="toast" class="toast hidden" role="alert"></div>
+<script src="/static/i18n.js"></script>
 <script src="/static/bt.js"></script>
 <script src="/static/app.js"></script>
 </body>

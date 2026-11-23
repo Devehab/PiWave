@@ -1,6 +1,8 @@
 "use strict";
 /* PiRadio web UI — vanilla JS, works offline on the Pi's own Wi-Fi. */
 
+const t = window.I18N.t;
+document.title = t("app_title");
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -21,7 +23,7 @@ async function api(path, body, method) {
   const r = await fetch(path, opt);
   let j = null;
   try { j = await r.json(); } catch (_) { /* not json */ }
-  if (!r.ok || (j && j.ok === false)) throw new Error((j && j.error) || ("خطأ " + r.status));
+  if (!r.ok || (j && j.ok === false)) throw new Error((j && j.error) || ("Error " + r.status));
   return j;
 }
 let toastTimer;
@@ -82,7 +84,7 @@ async function poll(once) {
   } catch (_) {
     if (!restarting) {
       $("#air").className = "air err";
-      $("#air-text").textContent = "مش متصل بالجهاز";
+      $("#air-text").textContent = t("air_offline");
     }
   } finally {
     if (!once) setTimeout(poll, document.hidden ? 4000 : 1000);
@@ -95,12 +97,12 @@ function render(st) {
   const tx = st.tx, p = st.player, f = tx.frequency;
   // header pill
   const air = $("#air");
-  const label = { on_air: "على الهواء " + fmtFreq(f), starting: "جاري تشغيل البث…", error: "في مشكلة بالبث", off: "البث متوقف" }[tx.status] || tx.status;
+  const label = { on_air: t("air_on", { f: fmtFreq(f) }), starting: t("air_starting"), error: t("air_error"), off: t("air_off") }[tx.status] || tx.status;
   air.className = "air " + ({ on_air: "on", starting: "starting", error: "err" }[tx.status] || "off");
   $("#air-text").textContent = label;
   const tb = $("#tx-toggle");
   tb.classList.toggle("on", tx.on);
-  $("span", tb).textContent = tx.on ? "البث شغال" : "شغّل البث";
+  $("span", tb).textContent = tx.on ? t("tx_on") : t("tx_off");
   // frequency
   const shown = draftFreq ?? f;
   $("#freq-num").textContent = fmtFreq(shown);
@@ -108,17 +110,17 @@ function render(st) {
   $("#freq-pending").classList.toggle("hidden", draftFreq === null);
   if (draftFreq !== null) $("#freq-draft").textContent = fmtFreq(draftFreq);
   $("#car-hint").innerHTML = tx.status === "error"
-    ? `<span class="bad-text">${esc(tx.error)}</span>${tx.retry_in ? ` · محاولة جديدة بعد ${tx.retry_in} ث` : ""}`
-    : `بالسيارة: اضغط <b>FM</b> وحط التردد على <b dir="ltr">${fmtFreq(f)}</b>، وعلى الشاشة رح يطلع <b dir="ltr">${esc(st.rds.ps.trim())}</b>`;
+    ? `<span class="bad-text">${esc(tx.error)}</span>${tx.retry_in ? t("retry_in", { s: tx.retry_in }) : ""}`
+    : t("car_hint", { f: fmtFreq(f), ps: esc(st.rds.ps.trim()) });
   // now playing
-  const t = p.track;
-  $("#now-title").textContent = t ? t.title : "ما في شي شغال";
-  $("#now-artist").textContent = p.live && t
-    ? (p.live.kind === "ptt" ? "متوقفة لحد ما تخلص حكي، وبترجع لحالها" : "متوقفة: الراديو على البلوتوث. اضغط ▶ لترجع للأغاني")
-    : t ? (t.artist || (p.state === "paused" ? "متوقف مؤقتاً" : "")) : (st.library.count ? "اضغط ▶ أو اختار أغنية" : "ارفع أغاني من تبويب «الأغاني»");
+  const tr = p.track;
+  $("#now-title").textContent = tr ? tr.title : t("now_none");
+  $("#now-artist").textContent = p.live && tr
+    ? (p.live.kind === "ptt" ? t("lib_wait_ptt") : t("lib_wait_bt"))
+    : tr ? (tr.artist || (p.state === "paused" ? t("now_paused") : "")) : (st.library.count ? t("now_press") : t("now_upload"));
   renderLive(st);
   $("#art").classList.toggle("playing", p.state === "playing");
-  const dur = t && t.duration ? t.duration : 0;
+  const dur = tr && tr.duration ? tr.duration : 0;
   const seek = $("#seek");
   seek.max = dur || 100;
   seek.disabled = !dur;
@@ -135,7 +137,7 @@ function render(st) {
   const pe = $("#player-error");
   pe.textContent = p.error || "";
   pe.classList.toggle("hidden", !p.error);
-  $$("#tracks li").forEach((li) => li.classList.toggle("current", t && li.dataset.id === t.id));
+  $$("#tracks li").forEach((li) => li.classList.toggle("current", tr && li.dataset.id === tr.id));
   $("#v-cur").textContent = st.version;
   renderGuides(st);
   if (!settingsFilled) fillSettings(st.settings);
@@ -146,7 +148,7 @@ function renderLive(st) {
   const live = st.player.live, bt = st.bt || {};
   const card = $("#live-card");
   const btConn = bt.installed && bt.enabled && bt.connected;
-  $("#q-bt-sub").textContent = btConn ? "متصل: " + bt.connected : bt.pairing_left ? "وضع الاقتران شغال" : "وصّل تلفونك";
+  $("#q-bt-sub").textContent = btConn ? t("q_bt_conn", { name: bt.connected }) : bt.pairing_left ? t("q_bt_pairing") : t("q_bt_sub");
   if (!live && !btConn) { card.classList.add("hidden"); return; }
   card.classList.remove("hidden");
   const isPtt = live && live.kind === "ptt";
@@ -154,15 +156,15 @@ function renderLive(st) {
   $("use", $("#live-ico")).setAttribute("href", isPtt ? "#i-mic" : "#i-bt");
   $("#live-badge").classList.toggle("hidden", !live);
   if (isPtt) {
-    $("#live-title").textContent = "بث مباشر من المايك";
-    $("#live-sub").textContent = `صار ${fmtTime(live.seconds)}`;
+    $("#live-title").textContent = t("live_mic");
+    $("#live-sub").textContent = t("live_for", { t: fmtTime(live.seconds) });
   } else {
     const tr = bt.track;
-    $("#live-title").textContent = "بلوتوث: " + (live ? live.label : bt.connected);
+    $("#live-title").textContent = t("bt_label", { name: live ? live.label : bt.connected });
     $("#live-sub").textContent = tr ? (tr.artist ? `${tr.title} · ${tr.artist}` : tr.title)
-      : live ? "صوت التلفون عم ينبث على الراديو"
-      : bt.suppressed ? "الراديو على أغاني الجهاز. وقّف وشغّل بالتلفون ليرجع عليه"
-      : "شغّل أي صوت بالتلفون وبيطلع على الراديو";
+      : live ? t("bt_streaming")
+      : bt.suppressed ? t("bt_suppressed")
+      : t("bt_hint");
     const playing = tr ? tr.status === "playing" : !!live;
     $("use", $('[data-btmedia="toggle"]')).setAttribute("href", playing ? "#i-pause" : "#i-play");
   }
@@ -178,7 +180,7 @@ $$("[data-btmedia]").forEach((b) => b.addEventListener("click", () => {
   }
   act(() => api("/api/bluetooth/media", { command: cmd }));
 }));
-$("#live-back").addEventListener("click", () => act(() => api("/api/player/play", {}), "رجعنا لأغاني الجهاز"));
+$("#live-back").addEventListener("click", () => act(() => api("/api/player/play", {}), t("live_back_done")));
 
 /* ------------------------------------------------------------ Bluetooth sheet */
 let btPanel = null;
@@ -214,13 +216,13 @@ $("#freq-cancel").addEventListener("click", () => { draftFreq = null; if (S) ren
 $("#freq-apply").addEventListener("click", async () => {
   const v = draftFreq;
   if (v === null) return;
-  if (v < 87.5 && !confirm("التردد أقل من 87.5: معظم راديوهات السيارات ما بتوصل له. متأكد؟")) return;
-  await act(() => api("/api/frequency", { frequency: v }), `تمام: ${fmtFreq(v)}. غيّر راديو السيارة لنفس التردد`);
+  if (v < 87.5 && !confirm(t("freq_low"))) return;
+  await act(() => api("/api/frequency", { frequency: v }), t("freq_set", { f: fmtFreq(v) }));
   draftFreq = null;
 });
 $("#tx-toggle").addEventListener("click", () => {
   if (!S) return;
-  if (S.tx.on && !confirm("توقف البث؟")) return;
+  if (S.tx.on && !confirm(t("tx_stop_q"))) return;
   act(() => api("/api/transmitter", { on: !S.tx.on }));
 });
 
@@ -232,7 +234,7 @@ $("#b-shuffle").addEventListener("click", () => S && act(() => api("/api/player/
 $("#b-repeat").addEventListener("click", () => {
   if (!S) return;
   const next = { off: "all", all: "one", one: "off" }[S.player.repeat];
-  act(() => api("/api/player/modes", { repeat: next }), { off: "بدون تكرار", all: "تكرار الكل", one: "تكرار نفس الأغنية" }[next]);
+  act(() => api("/api/player/modes", { repeat: next }), { off: t("rep_off"), all: t("rep_all"), one: t("rep_one") }[next]);
 });
 const seekEl = $("#seek");
 seekEl.addEventListener("input", () => { seeking = true; $("#t-pos").textContent = fmtTime(+seekEl.value); });
@@ -247,7 +249,7 @@ volEl.addEventListener("change", async () => {
   setTimeout(() => { volDragging = false; }, 600);
 });
 function playTone() {
-  act(() => api("/api/player/tone", {}), "نغمة اختبار لمدة 20 ثانية: لازم تسمعها بالسيارة");
+  act(() => api("/api/player/tone", {}), t("tone_toast"));
 }
 $("#q-tone").addEventListener("click", playTone);
 $("#c-tone").addEventListener("click", playTone);
@@ -261,30 +263,30 @@ async function loadLibrary() {
 }
 function renderLibrary() {
   const q = $("#search").value.trim().toLowerCase();
-  const list = lib.tracks.filter((t) => !q || (t.title + " " + (t.artist || "") + " " + t.file).toLowerCase().includes(q));
+  const list = lib.tracks.filter((x) => !q || (x.title + " " + (x.artist || "") + " " + x.file).toLowerCase().includes(q));
   $("#lib-count").textContent = lib.tracks.length ? `(${lib.tracks.length})` : "";
   $("#lib-empty").classList.toggle("hidden", lib.tracks.length > 0);
   const cur = S && S.player.track ? S.player.track.id : null;
-  $("#tracks").innerHTML = list.map((t) => `
-    <li data-id="${esc(t.id)}" class="${t.id === cur ? "current" : ""}">
-      <button class="t-btn" data-play="${esc(t.id)}" type="button" aria-label="تشغيل"><svg><use href="#i-play"/></svg></button>
-      <div class="t-main" data-play="${esc(t.id)}">
-        <div class="t-title">${esc(t.title)}</div>
-        <div class="t-sub">${esc(t.artist || "")}${t.artist ? " · " : ""}<span dir="ltr">${fmtTime(t.duration)}</span></div>
+  $("#tracks").innerHTML = list.map((x) => `
+    <li data-id="${esc(x.id)}" class="${x.id === cur ? "current" : ""}">
+      <button class="t-btn" data-play="${esc(x.id)}" type="button" aria-label="${t("play")}"><svg><use href="#i-play"/></svg></button>
+      <div class="t-main" data-play="${esc(x.id)}">
+        <div class="t-title" dir="auto">${esc(x.title)}</div>
+        <div class="t-sub">${esc(x.artist || "")}${x.artist ? " · " : ""}<span dir="ltr">${fmtTime(x.duration)}</span></div>
       </div>
-      <button class="t-btn del" data-del="${esc(t.id)}" data-name="${esc(t.title)}" type="button" aria-label="حذف"><svg><use href="#i-trash"/></svg></button>
+      <button class="t-btn del" data-del="${esc(x.id)}" data-name="${esc(x.title)}" type="button" aria-label="${t("del")}"><svg><use href="#i-trash"/></svg></button>
     </li>`).join("");
-  $("#bad-tracks").innerHTML = (lib.bad || []).map((t) => `
-    <li><div class="t-main"><div class="t-title">${esc(t.file)}</div><div class="t-sub bad-text">ملف مش صالح للتشغيل</div></div>
-      <button class="t-btn del" data-del="${esc(t.id)}" data-name="${esc(t.file)}" type="button" aria-label="حذف"><svg><use href="#i-trash"/></svg></button></li>`).join("");
+  $("#bad-tracks").innerHTML = (lib.bad || []).map((x) => `
+    <li><div class="t-main"><div class="t-title" dir="auto">${esc(x.file)}</div><div class="t-sub bad-text">${t("bad_file")}</div></div>
+      <button class="t-btn del" data-del="${esc(x.id)}" data-name="${esc(x.file)}" type="button" aria-label="${t("del")}"><svg><use href="#i-trash"/></svg></button></li>`).join("");
 }
 $("#search").addEventListener("input", renderLibrary);
 document.addEventListener("click", (e) => {
   const play = e.target.closest("[data-play]");
   if (play) { act(() => api("/api/player/play", { id: play.dataset.play })); return; }
   const del = e.target.closest("[data-del]");
-  if (del && confirm(`حذف «${del.dataset.name}» من الجهاز؟`)) {
-    act(() => api("/api/library/" + encodeURIComponent(del.dataset.del), undefined, "DELETE"), "انحذفت").then(loadLibrary);
+  if (del && confirm(t("del_q", { name: del.dataset.name }))) {
+    act(() => api("/api/library/" + encodeURIComponent(del.dataset.del), undefined, "DELETE"), t("deleted")).then(loadLibrary);
   }
 });
 
@@ -300,9 +302,9 @@ function uploadFile(file, { play = false, onProgress } = {}) {
     x.onload = () => {
       let j = {};
       try { j = JSON.parse(x.responseText); } catch (_) { /* ignore */ }
-      if (x.status === 200 && j.ok) resolve(j); else reject(new Error(j.error || "فشل الرفع (" + x.status + ")"));
+      if (x.status === 200 && j.ok) resolve(j); else reject(new Error(j.error || t("up_failed", { code: x.status })));
     };
-    x.onerror = () => reject(new Error("انقطع الاتصال أثناء الرفع"));
+    x.onerror = () => reject(new Error(t("up_lost")));
     x.send(fd);
   });
 }
@@ -329,7 +331,7 @@ $("#file-input").addEventListener("change", async (e) => {
       d.classList.add("fail"); $(".pct", d).textContent = "✗"; $(".name", d).textContent = files[i].name + ": " + err.message;
     }
   }
-  if (files.length) toast(`انرفع ${ok} من ${files.length}`, ok === files.length ? "ok" : "bad");
+  if (files.length) toast(t("up_done", { ok, n: files.length }), ok === files.length ? "ok" : "bad");
   loadLibrary();
   setTimeout(() => $$(".upload-item.done", box).forEach((d) => d.remove()), 8000);
 });
@@ -350,23 +352,23 @@ function renderChecks(c, sys) {
   const f = fmtFreq(c.frequency);
   const items = [];
   const row = (state, title, sub) => items.push(`<li><span class="dot ${state}">${state === "ok" ? "✓" : state === "no" ? "✕" : "!"}</span><div><b>${title}</b><small>${sub}</small></div></li>`);
-  row(c.transmitter ? "ok" : "no", "برنامج البث", c.transmitter ? `شغال على <b dir="ltr">${f}</b> ميغاهيرتز` : (c.error ? esc(c.error) : "البث متوقف. شغّله من تبويب الراديو"));
-  if (!c.transmitter) row("wait", "الإشارة على الرجل 7", "بتنفحص لما يشتغل البث");
-  else if (c.gpio === "DEV") row("ok", "الإشارة على الرجل 7", "وضع التجربة على الكمبيوتر");
-  else row(c.pin_ok ? "ok" : "no", "الإشارة طالعة من الرجل 7 (GPIO4)", c.pin_ok ? "الرجل 7 مضبوطة على GPCLK0، يعني موجة الراديو طالعة عليها فعلياً" : "الرجل 7 مش طالع عليها الراديو (" + esc(c.gpio || "؟") + ")");
-  if (c.audio_flowing && (c.playing || c.level > 0.02)) row("ok", "الصوت واصل للمرسل", "في صوت عم ينبث هلأ (شوف العدّاد)");
-  else if (c.audio_flowing) row("wait", "الصوت واصل للمرسل", "البث شغال بس صامت. شغّل أغنية أو نغمة اختبار");
-  else row(c.transmitter ? "no" : "wait", "الصوت واصل للمرسل", "ما في صوت داخل على المرسل");
+  row(c.transmitter ? "ok" : "no", t("ck_tx"), c.transmitter ? t("ck_tx_on", { f }) : (c.error ? esc(c.error) : t("ck_tx_off")));
+  if (!c.transmitter) row("wait", t("ck_pin"), t("ck_pin_wait"));
+  else if (c.gpio === "DEV") row("ok", t("ck_pin"), t("ck_pin_dev"));
+  else row(c.pin_ok ? "ok" : "no", t("ck_pin_out"), c.pin_ok ? t("ck_pin_ok") : t("ck_pin_bad", { g: esc(c.gpio || "?") }));
+  if (c.audio_flowing && (c.playing || c.level > 0.02)) row("ok", t("ck_audio"), t("ck_audio_ok"));
+  else if (c.audio_flowing) row("wait", t("ck_audio"), t("ck_audio_silent"));
+  else row(c.transmitter ? "no" : "wait", t("ck_audio"), t("ck_audio_none"));
   const bt = S && S.bt;
   if (bt && bt.installed && bt.enabled) {
-    row(bt.available ? "ok" : "no", "البلوتوث", !bt.available ? "البلوتوث مش جاهز" : bt.connected
-      ? `متصل: ${esc(bt.connected)}${bt.on_air ? " · صوته على الهوا" : ""}` : "جاهز، ما في تلفون متصل (مش ضروري)");
+    row(bt.available ? "ok" : "no", t("ck_bt"), !bt.available ? t("ck_bt_notready") : bt.connected
+      ? t("ck_bt_conn", { name: esc(bt.connected) }) + (bt.on_air ? t("ck_bt_air") : "") : t("ck_bt_idle"));
   }
-  if (sys.undervoltage) row("no", "الكهربا", "الشاحن ضعيف هلأ! استعمل شاحن 5V / 2.5A وكيبل منيح");
-  else if (sys.undervoltage_past) row("wait", "الكهربا", "صار ضعف بالكهربا قبل شوي. جرّب شاحن أقوى");
-  else row("ok", "الكهربا", sys.undervoltage === null ? "ما في قراءة (وضع التجربة)" : "الكهربا كافية");
-  if (sys.temp != null) row(sys.temp < 75 ? "ok" : "no", "الحرارة", `<span dir="ltr">${sys.temp}°C</span>`);
-  row("wait", "آخر فحص: أذنك 👂", "شغّل نغمة الاختبار وتأكد إنك سامعها من سماعات السيارة");
+  if (sys.undervoltage) row("no", t("ck_power"), t("ck_power_now"));
+  else if (sys.undervoltage_past) row("wait", t("ck_power"), t("ck_power_past"));
+  else row("ok", t("ck_power"), sys.undervoltage === null ? t("ck_power_na") : t("ck_power_ok"));
+  if (sys.temp != null) row(sys.temp < 75 ? "ok" : "no", t("ck_temp"), `<span dir="ltr">${sys.temp}°C</span>`);
+  row("wait", t("ck_ear"), t("ck_ear_sub"));
   $("#checks").innerHTML = items.join("");
   $("#txlog").textContent = (c.log || []).join("\n") || "—";
 }
@@ -380,21 +382,16 @@ function renderGuides(st) {
   lastGuideKey = key;
   const fs = fmtFreq(f);
   const odd = Math.round(f * 10) % 2 === 1;
-  $("#car-steps").innerHTML = `
-    <li>شغّل راديو السيارة واضغط زر <b>FM</b> (أو <b>RADIO</b> وبعدين FM1).</li>
-    <li>استعمل زر <b>TUNE</b> أو الأسهم ‹ › عشان تبحث يدوياً لحد ما توصل <b dir="ltr">${fs}</b>. زر SEEK/SCAN ممكن يتخطى المحطة.</li>
-    <li>لازم الوشيش يختفي ويطلع الصوت، وعلى الشاشة رح يطلع <b dir="ltr">${esc(ps)}</b>.</li>
-    <li>اضغط مطوّل على زر حفظ (1 لـ 6) لحد ما تسمع «بيب». هيك المحطة بتنحفظ.</li>
-    <li>إذا سامع محطة تانية أو تشويش: اختار تردد <b>فاضي</b> (بس وشيش) وغيّره من تبويب الراديو.${odd ? "" : " <b>ملاحظة:</b> السيارات الأمريكية بتقبل بس الأرقام الفردية (مثل 87.9 أو 107.9)."}</li>
-    <li>إذا الراديو بيقفز لمحطة تانية لحاله، طفّي خاصية <b>AF</b> أو <b>REG</b> من إعدادات الراديو.</li>`;
+  $("#car-steps").innerHTML = ["car_1", "car_2", "car_3", "car_4", "car_5", "car_6"]
+    .map((k) => `<li>${t(k, { f: fs, ps: esc(ps) })}${k === "car_5" && !odd ? t("car_5_us") : ""}</li>`).join("");
   $("#ant-freq").textContent = fs + " MHz";
   const quarter = Math.round(29979 / f / 4);  // cm
   $("#ant-rows").innerHTML = `
-    <tr class="no"><td>بدون سلك</td><td>أقل من متر</td><td><span class="tag mid">ضعيف</span></td></tr>
-    <tr><td><b dir="ltr">10 cm</b></td><td>2 – 5 متر</td><td><span class="tag mid">إذا قريب من الراديو</span></td></tr>
-    <tr class="best"><td><b dir="ltr">20 cm</b></td><td>5 – 15 متر</td><td><span class="tag good">الأفضل للسيارة</span></td></tr>
-    <tr class="no"><td><span dir="ltr">${quarter} cm</span><br><small>(ربع الموجة)</small></td><td>50 – 100+ متر</td><td><span class="tag bad">لا تستعمله</span></td></tr>`;
-  $("#ant-note").innerHTML = `الأرقام تقريبية، وبتعتمد على مكان الريسبيري بالسيارة ونوع الراديو. حط الريسبيري قريب من الراديو أو من الزجاج. السلك الطويل بيوصّل أبعد، بس بيوصل لسيارات غيرك وبيشوّش على محطات وأجهزة تانية، وهاد ممنوع بأغلب الدول بدون ترخيص.`;
+    <tr class="no"><td>${t("ant_none")}</td><td>${t("ant_none_r")}</td><td><span class="tag mid">${t("ant_weak")}</span></td></tr>
+    <tr><td><b dir="ltr">10 cm</b></td><td>${t("ant_10_r")}</td><td><span class="tag mid">${t("ant_10_tag")}</span></td></tr>
+    <tr class="best"><td><b dir="ltr">20 cm</b></td><td>${t("ant_20_r")}</td><td><span class="tag good">${t("ant_20_tag")}</span></td></tr>
+    <tr class="no"><td><span dir="ltr">${quarter} cm</span><br><small>${t("ant_q")}</small></td><td>${t("ant_q_r")}</td><td><span class="tag bad">${t("ant_q_tag")}</span></td></tr>`;
+  $("#ant-note").textContent = t("ant_note");
 }
 
 function pinoutSVG() {
@@ -407,15 +404,15 @@ function pinoutSVG() {
     pins += `<rect x="${x0 + i * dx - 4.5}" y="${yOut - 4.5}" width="9" height="9" rx="4.5" fill="${fill(even)}" stroke="#0007"/>`;
   }
   const p7x = x0 + 3 * dx;
-  return `<svg viewBox="0 0 380 200" role="img" aria-label="رسمة توصيل السلك على الرجل 7">
+  return `<svg viewBox="0 0 380 200" role="img" aria-label="${t("pin_aria")}">
     <rect x="22" y="14" width="340" height="132" rx="12" fill="#1f5c3a" stroke="#2f7d52"/>
     <rect x="8" y="58" width="26" height="46" rx="3" fill="#8b919c"/><text x="21" y="85" font-size="9" text-anchor="middle" fill="#111">SD</text>
     <rect x="${x0 - 9}" y="${yOut - 9}" width="${19 * dx + 18}" height="${yIn - yOut + 18}" rx="3" fill="#0d2f1e"/>
     ${pins}
     <circle cx="${p7x}" cy="${yIn}" r="9" fill="none" stroke="#f5a524" stroke-width="2.4"><animate attributeName="r" values="8;12;8" dur="1.6s" repeatCount="indefinite"/></circle>
     <path d="M${p7x} ${yIn} C ${p7x} ${yIn + 40}, ${p7x + 60} ${yIn + 30}, ${p7x + 110} ${yIn + 55}" fill="none" stroke="#f5a524" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 0"/>
-    <text x="${p7x + 116}" y="${yIn + 60}" font-size="12" fill="#f5a524" font-weight="700">السلك 20 سم</text>
-    <text x="${p7x + 116}" y="${yIn + 76}" font-size="10" fill="#cfd3da">طرفه التاني حر</text>
+    <text x="${p7x + 116}" y="${yIn + 60}" font-size="12" fill="#f5a524" font-weight="700">${t("pin_wire")}</text>
+    <text x="${p7x + 116}" y="${yIn + 76}" font-size="10" fill="#cfd3da">${t("pin_free")}</text>
     <text x="${x0}" y="${yIn + 18}" font-size="9" text-anchor="middle" fill="#ffb547">1</text>
     <text x="${p7x}" y="${yIn + 18}" font-size="10" text-anchor="middle" fill="#f5a524" font-weight="700">7</text>
     <text x="${x0}" y="${yOut - 11}" font-size="9" text-anchor="middle" fill="#ff8a8a">2·5V</text>
@@ -423,7 +420,7 @@ function pinoutSVG() {
     <rect x="58" y="128" width="40" height="20" rx="3" fill="#8b919c"/><text x="78" y="162" font-size="9" text-anchor="middle" fill="#cfd3da">HDMI</text>
     <rect x="232" y="130" width="30" height="16" rx="3" fill="#8b919c"/><text x="247" y="162" font-size="9" text-anchor="middle" fill="#cfd3da">USB</text>
     <rect x="290" y="130" width="30" height="16" rx="3" fill="#34c77b"/><text x="305" y="162" font-size="9" text-anchor="middle" fill="#34c77b" font-weight="700">PWR IN</text>
-    <text x="305" y="176" font-size="9" text-anchor="middle" fill="#34c77b">الكهربا هون</text>
+    <text x="305" y="176" font-size="9" text-anchor="middle" fill="#34c77b">${t("pin_power")}</text>
   </svg>`;
 }
 
@@ -443,10 +440,10 @@ function fillSettings(s) {
   $("#s-bt-name-show").textContent = s.bt_name || "PiRadio";
 }
 $("#s-captive").addEventListener("change", (e) => act(() => api("/api/settings", { captive_mode: e.target.value }),
-  e.target.value === "once" ? "الصفحة رح تطلع مرة وحدة لكل تلفون" : "الصفحة رح تطلع كل ما تتصل"));
+  e.target.value === "once" ? t("captive_once_t") : t("captive_always_t")));
 $("#u-reset").addEventListener("click", () => {
-  if (!confirm("ترجع صفحة الترحيب تطلع لكل التلفونات من جديد؟")) return;
-  act(() => api("/api/captive/reset", {}), "تمام: رح تطلع أول ما يتصل أي تلفون");
+  if (!confirm(t("reset_q"))) return;
+  act(() => api("/api/captive/reset", {}), t("reset_done"));
 });
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true; } catch (_) { /* http page: fallback below */ }
@@ -465,18 +462,18 @@ async function copyText(text) {
 function pageURL() { return "http://" + ((sysInfo && sysInfo.wifi && sysInfo.wifi.ip) || location.hostname); }
 $("#u-copy").addEventListener("click", async () => {
   const url = pageURL();
-  if (await copyText(url)) toast("انسخ الرابط: " + url, "ok");
-  else toast("ما قدرت أنسخ. اكتبه بالمتصفح: " + url, "bad");
+  if (await copyText(url)) toast(t("copied", { url }), "ok");
+  else toast(t("copy_fail", { url }), "bad");
 });
 $("#s-save-rds").addEventListener("click", () => {
   const ps = $("#s-ps").value.trim();
-  if (!/^[ -~]{1,8}$/.test(ps)) { toast("اسم المحطة: من 1 لـ 8 أحرف إنجليزي أو أرقام", "bad"); return; }
-  act(() => api("/api/settings", { station_name: ps, rds_song_text: $("#s-rt").checked, ps_scroll: $("#s-scroll").checked, radiotext: $("#s-radiotext").value }), "انحفظ");
+  if (!/^[ -~]{1,8}$/.test(ps)) { toast(t("ps_bad"), "bad"); return; }
+  act(() => api("/api/settings", { station_name: ps, rds_song_text: $("#s-rt").checked, ps_scroll: $("#s-scroll").checked, radiotext: $("#s-radiotext").value }), t("saved"));
 });
 $("#s-save-audio").addEventListener("click", () => act(() => api("/api/settings", {
   preemphasis: $("#s-pre").value, transmit_on_boot: $("#s-txboot").checked, autoplay: $("#s-autoplay").checked,
   pi_code: $("#s-pi").value.trim(), ppm: parseFloat($("#s-ppm").value || "0"),
-}), "انحفظ"));
+}), t("saved")));
 
 async function loadSystem() {
   try {
@@ -484,16 +481,16 @@ async function loadSystem() {
     sysInfo = sys;
     if (document.activeElement !== $("#w-ssid")) $("#w-ssid").value = sys.wifi.ssid || "";
     if (document.activeElement !== $("#w-pass")) $("#w-pass").value = sys.wifi.password || "";
-    const power = sys.undervoltage ? "ضعيفة الآن ⚠" : sys.undervoltage_past ? "صار ضعف قبل شوي" : sys.undervoltage === null ? "—" : "ممتازة";
+    const power = sys.undervoltage ? t("pw_weak") : sys.undervoltage_past ? t("pw_past") : sys.undervoltage === null ? "—" : t("pw_ok");
     const up = sys.uptime != null ? fmtTime(sys.uptime) : "—";
     $("#sys").innerHTML = [
-      ["الحرارة", sys.temp != null ? `<span dir="ltr">${sys.temp}°C</span>` : "—"],
-      ["الكهربا", power],
-      ["المساحة الفاضية", sys.disk ? `<span dir="ltr">${fmtBytes(sys.disk.free)}</span>` : "—"],
-      ["مدة التشغيل", `<span dir="ltr">${up}</span>`],
-      ["الواي فاي", sys.wifi_mode === "hotspot" ? "شبكة الراديو" : sys.wifi_mode === "home" ? "واي فاي البيت" : "—"],
-      ["عنوان الصفحة", `<span dir="ltr">http://${esc(sys.wifi.ip)}</span>`],
-      ["البلوتوث", !S || !S.bt ? "—" : !S.bt.installed ? "مش مثبت" : !S.bt.enabled ? "مطفي" : S.bt.connected ? "متصل: " + esc(S.bt.connected) : "جاهز"],
+      [t("kv_temp"), sys.temp != null ? `<span dir="ltr">${sys.temp}°C</span>` : "—"],
+      [t("kv_power"), power],
+      [t("kv_disk"), sys.disk ? `<span dir="ltr">${fmtBytes(sys.disk.free)}</span>` : "—"],
+      [t("kv_uptime"), `<span dir="ltr">${up}</span>`],
+      [t("kv_wifi"), sys.wifi_mode === "hotspot" ? t("wifi_hot") : sys.wifi_mode === "home" ? t("wifi_home") : "—"],
+      [t("kv_url"), `<span dir="ltr">http://${esc(sys.wifi.ip)}</span>`],
+      [t("kv_bt"), !S || !S.bt ? "—" : !S.bt.installed ? t("bt_not_inst") : !S.bt.enabled ? t("bt_off") : S.bt.connected ? t("q_bt_conn", { name: esc(S.bt.connected) }) : t("bt_ready")],
     ].map(([k, v]) => `<li><span>${k}</span><span>${v}</span></li>`).join("");
     $("#u-url").textContent = pageURL();
     $("#v-cur").textContent = ver.running || ver.version || "?";
@@ -501,25 +498,25 @@ async function loadSystem() {
     $("#v-rollback").disabled = !ver.previous;
     const r = ver.result, box = $("#v-result");
     if (ver.pending) {
-      box.className = "note"; box.textContent = `جاري فحص الإصدار ${ver.pending.version} بعد التحديث…`;
+      box.className = "note"; box.textContent = t("upd_checking", { v: ver.pending.version });
     } else if (r && r.result === "ok") {
-      box.className = "note ok"; box.textContent = `✓ آخر تحديث نجح: ${r.from || "—"} ← ${r.version}`;
+      box.className = "note ok"; box.textContent = t("upd_ok", { from: r.from || "—", v: r.version });
     } else if (r && r.result === "rolled_back") {
-      box.className = "note bad"; box.textContent = `✕ الإصدار ${r.from} ما اشتغل، فرجعنا للإصدار ${r.to}. السبب: ${r.reason || "—"}`;
+      box.className = "note bad"; box.textContent = t("upd_rolled", { from: r.from, to: r.to, reason: r.reason || "—" });
     } else box.className = "note hidden";
   } catch (_) { /* offline */ }
 }
 $("#w-save").addEventListener("click", async () => {
   const ssid = $("#w-ssid").value.trim(), pass = $("#w-pass").value;
-  if (!ssid) { toast("اكتب اسم الشبكة", "bad"); return; }
-  if (pass.length < 8) { toast("كلمة السر لازم تكون 8 أحرف أو أكثر", "bad"); return; }
-  if (!confirm(`رح تتغير الشبكة لـ «${ssid}» وموبايلك رح ينفصل. كمّل؟`)) return;
-  try { await api("/api/wifi", { ssid, password: pass }); overlay(`اتصل بالشبكة الجديدة «${ssid}» وبعدين افتح http://192.168.4.1`); }
+  if (!ssid) { toast(t("w_need_ssid"), "bad"); return; }
+  if (pass.length < 8) { toast(t("w_short"), "bad"); return; }
+  if (!confirm(t("w_change_q", { ssid }))) return;
+  try { await api("/api/wifi", { ssid, password: pass }); overlay(t("w_changed", { ssid })); }
   catch (e) { toast(e.message, "bad"); }
 });
 $("#w-home").addEventListener("click", async () => {
-  if (!confirm("الجهاز رح يطلع من شبكة الراديو ويتصل بواي فاي البيت لحد ما يعيد التشغيل. كمّل؟")) return;
-  try { await api("/api/wifi/home", {}); overlay("الجهاز عم يتصل بواي فاي البيت. من شبكة البيت افتح http://piradio.local، وبعد إعادة التشغيل بترجع شبكة الراديو."); }
+  if (!confirm(t("w_home_q"))) return;
+  try { await api("/api/wifi/home", {}); overlay(t("w_home_done")); }
   catch (e) { toast(e.message, "bad"); }
 });
 
@@ -535,7 +532,7 @@ function waitForRestart(text, expectVersion) {
       const ready = expectVersion ? st.version === expectVersion : sawDown || Date.now() - started > 15000;
       if (ready && Date.now() - started > 4000) { location.reload(); return; }
     } catch (_) { sawDown = true; }
-    if (Date.now() - started > 240000) { overlay("الجهاز لسا ما رجع. حدّث الصفحة بعد شوي."); return; }
+    if (Date.now() - started > 240000) { overlay(t("not_back")); return; }
     setTimeout(tick, 2000);
   };
   setTimeout(tick, 3000);
@@ -544,10 +541,10 @@ $("#update-input").addEventListener("change", (e) => {
   const file = e.target.files && e.target.files[0];
   e.target.value = "";
   if (!file) return;
-  if (!confirm(`تثبيت التحديث «${file.name}»؟ الراديو رح يوقف ثواني ويرجع.`)) return;
+  if (!confirm(t("upd_q", { name: file.name }))) return;
   const box = $("#update-progress"), bar = $(".bar i", box), text = $("#update-text"), logEl = $("#update-log");
   box.classList.remove("hidden"); logEl.classList.add("hidden"); bar.style.width = "0";
-  text.textContent = "جاري رفع الملف…";
+  text.textContent = t("upd_uploading");
   const fd = new FormData();
   fd.append("file", file, file.name);
   const x = new XMLHttpRequest();
@@ -556,36 +553,36 @@ $("#update-input").addEventListener("change", (e) => {
     if (!ev.lengthComputable) return;
     const p = ev.loaded / ev.total;
     bar.style.width = (p * 100).toFixed(0) + "%";
-    if (p >= 1) text.textContent = "جاري الفحص والتثبيت… (ممكن ياخد دقيقة أو دقيقتين، لا تسكّر الصفحة)";
+    if (p >= 1) text.textContent = t("upd_installing");
   };
   x.onload = () => {
     let j = {};
     try { j = JSON.parse(x.responseText); } catch (_) { /* ignore */ }
     if (x.status === 200 && j.ok) {
-      text.textContent = `انثبت الإصدار ${j.version}`;
-      waitForRestart(`تم تثبيت الإصدار ${j.version} ✓\nالجهاز عم يعيد تشغيل الراديو…`, j.version);
+      text.textContent = t("upd_installed", { v: j.version });
+      waitForRestart(t("upd_restarting", { v: j.version }), j.version);
     } else {
-      text.innerHTML = `<span class="bad-text">فشل التحديث: ${esc(j.error || x.status)}</span>. ما تغيّر شي، والإصدار الحالي لسا شغال.`;
+      text.innerHTML = t("upd_failed", { err: esc(j.error || x.status) });
       if (j.log && j.log.length) { logEl.textContent = j.log.join("\n"); logEl.classList.remove("hidden"); }
     }
   };
-  x.onerror = () => { text.innerHTML = `<span class="bad-text">انقطع الاتصال أثناء الرفع.</span> جرّب مرة تانية.`; };
+  x.onerror = () => { text.innerHTML = t("upd_lost"); };
   x.send(fd);
 });
 $("#v-rollback").addEventListener("click", async () => {
   const prev = $("#v-prev").textContent;
-  if (!confirm(`الرجوع للإصدار ${prev}؟`)) return;
-  try { await api("/api/update/rollback", {}); waitForRestart(`جاري الرجوع للإصدار ${prev}…`, prev); }
+  if (!confirm(t("rb_q", { v: prev }))) return;
+  try { await api("/api/update/rollback", {}); waitForRestart(t("rb_doing", { v: prev }), prev); }
   catch (e) { toast(e.message, "bad"); }
 });
 $("#p-reboot").addEventListener("click", async () => {
-  if (!confirm("إعادة تشغيل الجهاز؟ (حوالي دقيقة)")) return;
-  try { await api("/api/system/reboot", {}); waitForRestart("الجهاز عم يعيد التشغيل… إذا انفصل موبايلك، ارجع اتصل بشبكة الراديو."); }
+  if (!confirm(t("reboot_q"))) return;
+  try { await api("/api/system/reboot", {}); waitForRestart(t("reboot_doing")); }
   catch (e) { toast(e.message, "bad"); }
 });
 $("#p-off").addEventListener("click", async () => {
-  if (!confirm("إطفاء الجهاز؟")) return;
-  try { await api("/api/system/shutdown", {}); restarting = true; overlay("الجهاز عم يطفي. استنى 20 ثانية لحد ما يطفي الضو الأخضر، وبعدين افصل الكهربا."); }
+  if (!confirm(t("off_q"))) return;
+  try { await api("/api/system/shutdown", {}); restarting = true; overlay(t("off_doing")); }
   catch (e) { toast(e.message, "bad"); }
 });
 
@@ -602,7 +599,7 @@ function openRecorder() {
 function resetRecorder() {
   $("#rec-done").classList.add("hidden");
   $("#rec-time").textContent = "00:00";
-  $("#rec-hint").textContent = "اضغط الزر الأحمر وابدأ احكي";
+  $("#rec-hint").textContent = t("rec_hint");
   $("#rec-btn").classList.remove("recording");
   rec.blob = null;
 }
@@ -624,7 +621,7 @@ async function startRecording() {
   try {
     rec.stream = await navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: true, autoGainControl: true } });
   } catch (e) {
-    toast("ما في صلاحية للمايكروفون. اسمح للمتصفح يستعمل المايك.", "bad");
+    toast(t("mic_denied"), "bad");
     return;
   }
   rec.mime = ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus", "audio/webm"].find((t) => window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || "";
@@ -636,16 +633,16 @@ async function startRecording() {
     rec.blob = new Blob(rec.chunks, { type: rec.mr.mimeType || rec.mime || "audio/webm" });
     $("#rec-audio").src = URL.createObjectURL(rec.blob);
     const d = new Date();
-    $("#rec-name").value = `تسجيل ${String(d.getHours()).padStart(2, "0")}-${String(d.getMinutes()).padStart(2, "0")}`;
+    $("#rec-name").value = `${t("rec_default")} ${String(d.getHours()).padStart(2, "0")}-${String(d.getMinutes()).padStart(2, "0")}`;
     $("#rec-done").classList.remove("hidden");
     $("#rec-btn").classList.remove("recording");
-    $("#rec-hint").textContent = "اسمعه، وإذا عاجبك ابعثه";
+    $("#rec-hint").textContent = t("rec_hint_done");
   };
   rec.mr.start(250);
   rec.t0 = Date.now();
   $("#rec-btn").classList.add("recording");
   $("#rec-done").classList.add("hidden");
-  $("#rec-hint").textContent = "عم يسجّل… اضغط مرة تانية لتوقف";
+  $("#rec-hint").textContent = t("rec_hint_rec");
   rec.timer = setInterval(() => {
     const s = Math.floor((Date.now() - rec.t0) / 1000);
     $("#rec-time").textContent = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
@@ -673,7 +670,7 @@ $("#rec-btn").addEventListener("click", () => {
 function recFile() {
   const mt = (rec.blob && rec.blob.type) || "";
   const ext = mt.includes("mp4") ? "m4a" : mt.includes("ogg") ? "ogg" : "webm";
-  const name = ($("#rec-name").value.trim() || "تسجيل") + "." + ext;
+  const name = ($("#rec-name").value.trim() || t("rec_default")) + "." + ext;
   return new File([rec.blob], name, { type: mt });
 }
 async function sendRecording(play) {
@@ -683,7 +680,7 @@ async function sendRecording(play) {
   try {
     await uploadFile(recFile(), { play });
     if (play && $("#rec-loop").checked) await api("/api/player/modes", { repeat: "one" });
-    toast(play ? "📡 التسجيل عم ينبث هلأ على الراديو" : "انحفظ التسجيل بالمكتبة", "ok");
+    toast(play ? t("rec_on_air") : t("rec_saved"), "ok");
     closeRecorder();
     loadLibrary();
     poll(true);
@@ -699,7 +696,7 @@ $("#rec-capture").addEventListener("change", async (e) => {
   const f = e.target.files && e.target.files[0];
   e.target.value = "";
   if (!f) return;
-  try { await uploadFile(f, { play: true }); toast("📡 التسجيل عم ينبث هلأ", "ok"); closeRecorder(); loadLibrary(); }
+  try { await uploadFile(f, { play: true }); toast(t("rec_on_air"), "ok"); closeRecorder(); loadLibrary(); }
   catch (err) { toast(err.message, "bad"); }
 });
 
@@ -715,7 +712,7 @@ function openPTT() {
   $("#ptt-https").href = "https://" + location.hostname + "/#talk";
   pttUI("ready");
   if (secure && modern && !ptt.node) {   // ask for the microphone now, so pressing starts instantly
-    pttMic().catch((e) => toast(e && e.name === "NotAllowedError" ? "ما في صلاحية للمايكروفون. اسمح للمتصفح يستعمل المايك." : "ما قدرت أشغّل المايك", "bad"));
+    pttMic().catch((e) => toast(e && e.name === "NotAllowedError" ? t("mic_denied") : t("mic_fail"), "bad"));
   }
 }
 async function closePTT() {
@@ -731,8 +728,8 @@ function pttUI(mode) {
   btn.classList.toggle("live", mode === "live");
   btn.classList.toggle("wait", mode === "wait");
   $("#ptt-status").className = "ptt-status " + mode;
-  $("#ptt-state").textContent = { ready: "جاهز", wait: "جاري التجهيز…", live: "🔴 على الهوا", lost: "انقطع الاتصال" }[mode] || mode;
-  $("#ptt-label").textContent = mode === "live" ? (latch ? "اضغط لتوقف" : "اترك الزر لتوقف") : (latch ? "اضغط مرة وابدأ احكي" : "اضغط مطوّل واحكي");
+  $("#ptt-state").textContent = { ready: t("ptt_ready"), wait: t("ptt_wait"), live: t("ptt_live"), lost: t("ptt_lost") }[mode] || mode;
+  $("#ptt-label").textContent = mode === "live" ? (latch ? t("ptt_tap_stop") : t("ptt_release")) : (latch ? t("ptt_tap") : t("ptt_hold"));
   if (mode !== "live") { $("#ptt-time").textContent = ""; $("#ptt-level").style.width = "0"; }
 }
 async function pttMic() {
@@ -781,7 +778,7 @@ async function pttStart() {
     } catch (e) {
       ptt.on = false;
       pttUI("ready");
-      toast(e && e.name === "NotAllowedError" ? "ما في صلاحية للمايكروفون. اسمح للمتصفح يستعمل المايك." : (e.message || "ما زبط"), "bad");
+      toast(e && e.name === "NotAllowedError" ? t("mic_denied") : (e.message || t("failed")), "bad");
     }
   })();
   await ptt.starting;
@@ -810,7 +807,7 @@ async function pttPump(drain) {
     ptt.sending = true;
     try {
       const r = await fetch(`/api/ptt/${ptt.sid}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: all.buffer });
-      if (r.status === 410) { ptt.on = false; ptt.sid = null; clearInterval(ptt.timer); pttUI("ready"); toast("انتهى البث المباشر (حدا تاني بلّش يحكي أو انقطع الاتصال)", "bad"); }
+      if (r.status === 410) { ptt.on = false; ptt.sid = null; clearInterval(ptt.timer); pttUI("ready"); toast(t("ptt_ended"), "bad"); }
     } catch (_) {
       if (ptt.on) pttUI("lost");
     } finally { ptt.sending = false; }
@@ -834,6 +831,18 @@ $("#ptt-close").addEventListener("click", closePTT);
 $("#ptt").addEventListener("click", (e) => { if (e.target.id === "ptt") closePTT(); });
 $("#q-talk").addEventListener("click", openPTT);
 document.addEventListener("visibilitychange", () => { if (document.hidden && ptt.on) pttStop(); });
+
+/* ------------------------------------------------------------ language */
+$$("[data-lang]").forEach((b) => {
+  const on = b.dataset.lang === window.I18N.lang;
+  b.classList.toggle("on", on);
+  b.setAttribute("aria-checked", on ? "true" : "false");
+  b.addEventListener("click", async () => {
+    if (b.dataset.lang === window.I18N.lang) return;
+    try { await api("/api/settings", { language: b.dataset.lang }); location.reload(); }
+    catch (e) { toast(e.message, "bad"); }
+  });
+});
 
 /* ------------------------------------------------------------ start */
 $("#pinout").innerHTML = pinoutSVG();

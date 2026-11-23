@@ -25,6 +25,7 @@ DEFAULTS = {
     "bt_name": "PiRadio",        # name the phone shows in its Bluetooth list
     "bt_last": None,             # last connected phone (reconnected after boot)
     "captive_mode": "once",      # welcome page: "once" per phone, or "always"
+    "language": "en",            # web page language: "en" or "ar"
 }
 
 PS_RE = re.compile(r"^[ -~]{1,8}$")      # printable ASCII, 1..8 chars
@@ -102,6 +103,11 @@ def validate(key, value):
         v = str(value)
         if v not in ("once", "always"):
             raise SettingsError("قيمة صفحة الترحيب غير صحيحة")
+        return v
+    if key == "language":
+        v = str(value)
+        if v not in ("en", "ar"):
+            raise SettingsError("اللغة لازم تكون en أو ar")
         return v
     if key == "last_track":
         return None if value is None else str(value)

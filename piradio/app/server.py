@@ -12,6 +12,7 @@ from flask import Flask, Request, jsonify, redirect, request, send_from_director
 
 import captive
 import system
+from i18n import tr
 import updater
 from bluetooth import BTError
 from radio import LiveEnded
@@ -49,6 +50,18 @@ def create_app(radio):
     def body():
         return request.get_json(silent=True) or {}
 
+    def T(text):
+        """Message in the page's language (messages are written in Arabic)."""
+        return tr(text, radio.settings.get("language"))
+
+    def page(name):
+        """HTML page in the chosen language from the first paint (no flash)."""
+        with open(os.path.join(STATIC, name), encoding="utf-8") as f:
+            html = f.read()
+        if radio.settings.get("language") == "ar":
+            html = html.replace('<html lang="en" dir="ltr">', '<html lang="ar" dir="rtl">', 1)
+        return html
+
     def ok(**extra):
         return jsonify(dict(ok=True, **extra))
 
@@ -56,15 +69,15 @@ def create_app(radio):
     @app.errorhandler(ValueError)
     @app.errorhandler(BTError)
     def bad_request(e):
-        return jsonify(ok=False, error=str(e)), 400
+        return jsonify(ok=False, error=T(str(e))), 400
 
     @app.errorhandler(LiveEnded)
     def live_ended(e):
-        return jsonify(ok=False, error="انتهى البث المباشر", ended=True), 410
+        return jsonify(ok=False, error=T("انتهى البث المباشر"), ended=True), 410
 
     @app.errorhandler(413)
     def too_big(e):
-        return jsonify(ok=False, error="الملف كبير كثير (الحد 1GB)"), 413
+        return jsonify(ok=False, error=T("الملف كبير كثير (الحد 1GB)")), 413
 
     def client():
         return system.client_id(request.remote_addr)
@@ -99,13 +112,13 @@ def create_app(radio):
     # ---------------- static ----------------
     @app.get("/")
     def index():
-        r = send_from_directory(STATIC, "index.html")
+        r = app.response_class(page("index.html"), mimetype="text/html")
         r.headers["Cache-Control"] = "no-cache"
         return r
 
     @app.get("/welcome")
     def welcome_page():
-        r = send_from_directory(STATIC, "welcome.html")
+        r = app.response_class(page("welcome.html"), mimetype="text/html")
         r.headers["Cache-Control"] = "no-store"
         return r
 
@@ -135,6 +148,13 @@ def create_app(radio):
     def state():
         st = radio.state()
         st["version"] = VERSION
+        st["tx"]["error"] = T(st["tx"]["error"])
+        p = st["player"]
+        p["error"] = T(p["error"])
+        if p["track"] and p["track"]["id"] == "__tone__":
+            p["track"]["title"] = T(p["track"]["title"])
+        if p["live"]:
+            p["live"]["label"] = T(p["live"]["label"])
         return jsonify(st)
 
     @app.get("/api/library")
@@ -154,7 +174,9 @@ def create_app(radio):
 
     @app.get("/api/check")
     def check():
-        return jsonify(radio.signal_check())
+        c = radio.signal_check()
+        c["error"] = T(c["error"])
+        return jsonify(c)
 
     # ---------------- transmitter ----------------
     @app.post("/api/frequency")
@@ -239,13 +261,20 @@ def create_app(radio):
     @app.delete("/api/library/<tid>")
     def delete(tid):
         if not radio.delete_track(tid):
-            return jsonify(ok=False, error="الأغنية مش موجودة"), 404
+            return jsonify(ok=False, error=T("الأغنية مش موجودة")), 404
         return ok()
 
     # ---------------- Bluetooth ----------------
+    def bt_state():
+        s = radio.bt.status()
+        s["error"] = T(s["error"])
+        if s.get("install") and s["install"].get("log"):
+            s["install"] = dict(s["install"], log=T(s["install"]["log"]))
+        return s
+
     @app.get("/api/bluetooth")
     def bt_status():
-        return jsonify(radio.bt.status())
+        return jsonify(bt_state())
 
     @app.post("/api/bluetooth/<action>")
     def bt_action(action):
@@ -264,7 +293,7 @@ def create_app(radio):
             bt.install()
         else:
             return jsonify(ok=False, error="unknown action"), 404
-        return ok(bluetooth=bt.status())
+        return ok(bluetooth=bt_state())
 
     # ---------------- push-to-talk (live microphone) ----------------
     @app.post("/api/ptt/start")
@@ -298,7 +327,10 @@ def create_app(radio):
 
     @app.get("/api/version")
     def version():
-        return jsonify(dict(updater.info(), running=VERSION))
+        info = dict(updater.info(), running=VERSION)
+        if info.get("result") and info["result"].get("reason"):
+            info["result"] = dict(info["result"], reason=T(info["result"]["reason"]))
+        return jsonify(info)
 
     @app.post("/api/update")
     def update():
@@ -312,7 +344,7 @@ def create_app(radio):
                 v = updater.deploy(tmp, pending=True, log=lines.append)
             except updater.UpdateError as e:
                 log.error("update failed: %s", e)
-                return jsonify(ok=False, error=str(e), log=lines), 400
+                return jsonify(ok=False, error=T(str(e)), log=lines), 400
             log.info("update to %s installed, restarting", v)
             system.restart_service()
             return ok(version=v, previous=VERSION, log=lines)

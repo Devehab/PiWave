@@ -10,7 +10,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from werkzeug.serving import make_server  # noqa: E402
+from werkzeug.serving import ThreadedWSGIServer  # noqa: E402
 
 import system  # noqa: E402
 import updater  # noqa: E402
@@ -19,6 +19,43 @@ from server import create_app  # noqa: E402
 
 log = logging.getLogger("piradio")
 RELEASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+class WebServer(ThreadedWSGIServer):
+    """One thread per connection, and a connection that goes quiet is dropped
+    after a while instead of holding its thread forever."""
+    IDLE_TIMEOUT = 120
+
+    def finish_request(self, request, client_address):
+        request.settimeout(self.IDLE_TIMEOUT)
+        super().finish_request(request, client_address)
+
+
+class SecureWebServer(WebServer):
+    """HTTPS where every connection does its TLS handshake in its own thread.
+
+    werkzeug's built-in HTTPS does the handshake inside the accept loop, so a
+    single browser connection that opens and then stays silent (browsers
+    pre-open spare connections) froze the secure page for everybody.
+    """
+    HANDSHAKE_TIMEOUT = 10
+
+    def __init__(self, host, port, app, ctx):
+        super().__init__(host, port, app)
+        self.tls = ctx
+        self.ssl_context = ctx            # werkzeug reports https:// to the app
+
+    def finish_request(self, request, client_address):
+        request.settimeout(self.HANDSHAKE_TIMEOUT)
+        try:
+            conn = self.tls.wrap_socket(request, server_side=True)
+        except (OSError, ValueError):
+            return     # certificate warning closed, silent pre-connect, port scan...
+        try:
+            conn.settimeout(self.IDLE_TIMEOUT)
+            self.RequestHandlerClass(conn, client_address, self)
+        finally:
+            self.shutdown_request(conn)
 
 
 def watch_update_health(radio, started):
@@ -60,14 +97,14 @@ def main():
 
     servers = []
     http_port = int(env("PIRADIO_HTTP_PORT", "80"))
-    servers.append(make_server("0.0.0.0", http_port, app, threaded=True))
+    servers.append(WebServer("0.0.0.0", http_port, app))
     cert = env("PIRADIO_CERT", "/etc/piradio/cert.pem")
     key = env("PIRADIO_KEY", "/etc/piradio/key.pem")
     https_port = int(env("PIRADIO_HTTPS_PORT", "443"))
     if https_port and os.path.exists(cert) and os.path.exists(key):
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         ctx.load_cert_chain(cert, key)
-        servers.append(make_server("0.0.0.0", https_port, app, threaded=True, ssl_context=ctx))
+        servers.append(SecureWebServer("0.0.0.0", https_port, app, ctx))
     else:
         log.info("HTTPS disabled (no certificate): voice recording needs it")
 

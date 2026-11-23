@@ -22,12 +22,18 @@ import time
 import zipfile
 
 import requests
+import socket
+import urllib3
+
+urllib3.disable_warnings()
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PKG = os.path.join(ROOT, "piradio")
 WORK, SIM, PY = sys.argv[1], sys.argv[2], sys.argv[3]
 PORT = 8766
 URL = "http://127.0.0.1:%d" % PORT
+SPORT = 8767
+SURL = "https://127.0.0.1:%d" % SPORT
 BASE = os.path.join(WORK, "opt")
 DATA = os.path.join(WORK, "var")
 RUN = os.path.join(WORK, "run")
@@ -35,6 +41,8 @@ BOOT = os.path.join(WORK, "boot-music")
 LOG = os.path.join(WORK, "server.log")
 SONGS = os.path.join(WORK, "songs")
 FAKE_BT = os.path.join(WORK, "fakebt.json")
+CERT = os.path.join(WORK, "cert.pem")
+KEY = os.path.join(WORK, "key.pem")
 BT_FIFO = os.path.join(WORK, "phone-audio.fifo")
 VERSION = open(os.path.join(PKG, "VERSION")).read().strip()
 MAJ, MIN, PATCH = (int(x) for x in VERSION.split("."))
@@ -94,7 +102,8 @@ def sim_lines(since):
 
 def env():
     e = dict(os.environ, PIRADIO_DEV="1", PIRADIO_BASE=BASE, PIRADIO_DATA=DATA, PIRADIO_RUN=RUN,
-             PIRADIO_HTTP_PORT=str(PORT), PIRADIO_HTTPS_PORT="0", PIRADIO_BOOT_MUSIC=BOOT,
+             PIRADIO_HTTP_PORT=str(PORT), PIRADIO_HTTPS_PORT=str(SPORT), PIRADIO_BOOT_MUSIC=BOOT,
+             PIRADIO_CERT=CERT, PIRADIO_KEY=KEY,
              PIRADIO_FAKE_TX=SIM, TMPDIR=os.path.join(DATA, "tmp"),
              PIRADIO_BUSCTL=os.path.join(ROOT, "dev", "fake_busctl.py"), PIRADIO_FAKE_BT=FAKE_BT,
              PIRADIO_BT_INSTALLED="1", PIRADIO_CAPTIVE="1",
@@ -275,6 +284,9 @@ def main():
 
     print("== install (same code path as install.sh)")
     bt_init()
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "30",
+                    "-subj", "/CN=PiRadio", "-keyout", KEY, "-out", CERT],
+                   check=True, capture_output=True)
     v = updater.deploy(PKG, BASE, DATA, pending=False, log=lambda m: None)
     rel = os.path.realpath(os.path.join(BASE, "current"))
     check("installer deploys version %s" % VERSION, v == VERSION and os.path.isfile(os.path.join(rel, "bin", "pi_fm_rds")), v)
@@ -446,6 +458,20 @@ def main():
     code, j = api("POST", "/api/captive/reset")
     check("reset: every phone sees the welcome page again", code == 200 and probe("captive.apple.com", "/hotspot-detect.html").status_code == 302, j)
     api("POST", "/api/captive/ack")
+
+    print("== secure page (needed for the microphone)")
+    r = requests.get(SURL + "/api/state", verify=False, timeout=5)
+    check("https page works", r.status_code == 200 and r.json()["version"] == VERSION, r.status_code)
+    idle = [socket.create_connection(("127.0.0.1", SPORT)) for _ in range(3)]   # browsers pre-open spare connections
+    try:
+        t = time.time()
+        r = requests.get(SURL + "/api/state", verify=False, timeout=5)
+        ok_ = r.status_code == 200
+    except requests.RequestException as e:
+        ok_, r = False, e
+    check("https keeps answering while silent connections are open", ok_ and time.time() - t < 3, r)
+    for c in idle:
+        c.close()
 
     print("== push-to-talk (live microphone)")
     before = state()["player"]
